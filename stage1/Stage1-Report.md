@@ -242,10 +242,11 @@ that `String.equals` can do.
 
 ## 2.3 UML Class Diagram
 
-Rendered with Mermaid (`classDiagram`), which is the tool used throughout this
-report. PlantUML source for the same diagram is provided in
-`stage1/diagrams/ClassDiagram.puml` so it can be rendered to PNG/PDF if the
-submission requires an image.
+Rendered with Mermaid (`classDiagram`) so the diagram is visible inline in this
+report. The equivalent PlantUML source — which renders generics such as
+`IRepository<T>` and `Flux<String>` unambiguously — is in
+`stage1/diagrams/ClassDiagram.puml`. See "Diagram sources" at the end of this
+section.
 
 ```mermaid
 classDiagram
@@ -667,6 +668,38 @@ direction LR
     Command <|.. ExportCommand
     CommandInvoker o-- "0..*" Command
 ```
+
+### Diagram sources
+
+Every diagram in this report exists in two forms:
+
+| Form | Location | Purpose |
+|---|---|---|
+| **Mermaid** | inline in this `.md` | Renders directly on GitHub — this is the submission artifact |
+| **PlantUML** | `stage1/diagrams/*.puml` | Renderable to PNG/SVG/PDF for slides or a printed appendix |
+
+| File | Diagram | Section |
+|---|---|---|
+| `diagrams/ClassDiagram.puml` | UML class diagram | 2.3 |
+| `diagrams/UseCaseDiagram.puml` | UML use-case diagram (native `<<include>>` / `<<extend>>`) | 2.5 |
+| `diagrams/SD01.puml` | Upload Learning Material | 2.7 |
+| `diagrams/SD02.puml` | Summarize Document | 2.7 |
+| `diagrams/SD03.puml` | Q&A over Materials (RAG) | 2.7 |
+| `diagrams/SD04.puml` | Quiz Generation + Auto Grading | 2.7 |
+| `diagrams/SD05.puml` | Build Personalized Study Plan | 2.7 |
+| `diagrams/SD06.puml` | Extract Concepts + Concept Map | 2.7 |
+| `diagrams/SD07.puml` | Progress Tracking (Observer) | 2.7 |
+| `diagrams/SD08.puml` | Export Study Report | 2.7 |
+| `diagrams/SD09.puml` | CLI `/ask` | 2.10 |
+
+Render with `plantuml -tpng stage1/diagrams/*.puml`.
+
+The Mermaid use-case diagram in 2.5 is a visual approximation, since Mermaid's
+`flowchart` has no native use-case notation and no `«include»`/`«extend»`
+semantics — the dashed arrows there are labelled to mimic them. The
+authoritative use-case diagram with proper UML `<<include>>` and `<<extend>>`
+stereotypes is `diagrams/UseCaseDiagram.puml`. Mermaid is used for the class
+and sequence diagrams because it renders those accurately inline on GitHub.
 
 ### Relationship legend
 
@@ -1098,6 +1131,8 @@ no headless path to the agent for tests or automation.
 | UC-20 | View Aggregate Course Usage | Admin | — | F11, F15 |
 
 ```mermaid
+%% Approximate rendering. The authoritative diagram with native UML
+%% <<include>>/<<extend>> stereotypes is stage1/diagrams/UseCaseDiagram.puml
 flowchart TB
     STU(["<b>Student</b><br/>(primary)"])
     ADM(["<b>Admin</b>"])
