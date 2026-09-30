@@ -304,7 +304,7 @@ diagram in this report is therefore verified rather than assumed.
 
 | Relationship | Where it appears | Meaning |
 |---|---|---|
-| **Inheritance** (`<\|--`) | `ITool ← FileTool/SearchTool/QuizTool`; `ILLMClient ← LLMClient ← OpenAIAdapter/OllamaAdapter`; `IRepository ← MaterialRepository`; `View ← StudyAgentGUI/CLI`; `Command ← Summarize/Quiz/ExportCommand`; `ProgressListener ← ReminderService, StudyAgentGUI` | Substitutable polymorphism — every arrow is a substitutable type, never a "concrete class used as if different" |
+| **Inheritance** (`<\|--`) | `ITool ← FileTool/SearchTool/QuizTool`; `ILLMClient ← LLMClient ← OpenAIAdapter/OllamaAdapter`; `IRepository ← MaterialRepository/SessionRepository/FlashcardRepository`; `View ← StudyAgentGUI/CLI`; `Command ← Summarize/Quiz/Export/Upload/RemoveMaterial/ExtractConcepts/Ask/Flashcard/Submit/Plan/ShutdownCommand`; `ProgressListener ← ReminderService, StudyAgentGUI` | Substitutable polymorphism — every arrow is a substitutable type, never a "concrete class used as if different" |
 | **Interface realisation** (`..\|>`) | `LLMClient ..\|> ILLMClient`; adapters | Contract-first design; the interface is the stable seam |
 | **Aggregation** (`o--`) | `ToolManager o-- 0..* ITool`; `MemoryManager o-- ConversationHistory`; `AgentController o-- ProgressTracker`; `CommandInvoker o-- 0..* Command` | "has-a", parts can outlive/replace independently |
 | **Composition** (`*--`) | `Planner *-- 0..* PlanStep`; `AgentController`–`PromptBuilder`/`ResponseParser`; `StudyAgentGUI`–panels | "part-of", lifetime bound to the whole; steps die with their plan |
