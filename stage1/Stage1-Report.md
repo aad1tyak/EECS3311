@@ -450,6 +450,26 @@ direction LR
         +Embedding embed(String t)
     }
 
+    class AdminController {
+        -AgentController controller
+        -Course course
+        -boolean canPublish
+        +void onSeedCourse()
+        +void onViewInsights()
+        +SeedResult seedMaterials(Path sourceDir, Set courseDates)
+        +CourseInsights getInsights(Course c, DateRange r)
+        +void publishRemediation(String topic, Path material)
+    }
+
+    class AggregateAnalyticsService {
+        -IRepository~ProgressEvent~ repo
+        -int minStudentsForAggregate
+        +CourseInsights compute(Course c, DateRange r)
+        +Map~String,Double~ topicMastery(Course c)
+        +List~TopicScore~ classWideGaps(Map mastery, double threshold)
+        +List~String~ engagementFunnel(Course c)
+    }
+
     class OllamaAdapter {
         -String host
         -String model
@@ -597,6 +617,12 @@ direction LR
     CLI ..|> View
     CLI --> AgentController : calls
     CLI --> CommandInvoker : calls
+
+    AdminController ..|> View
+    AdminController --> AgentController : reuses (1)
+    AdminController o-- AggregateAnalyticsService
+    AggregateAnalyticsService --> IRepository : aggregates over
+    AggregateAnalyticsService ..> MaterialRepository : reads course scope
 
     Planner --> MemoryManager : queries (1)
     Planner --> ToolManager : plans against
