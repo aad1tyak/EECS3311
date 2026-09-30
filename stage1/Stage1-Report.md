@@ -589,7 +589,7 @@ OpenAI's chat-completions API and Ollama's local API differ in endpoint URL,
 request JSON shape, streaming format, authentication, and error taxonomy.
 Writing against them directly would scatter provider details through
 `PromptBuilder`, `ResponseParser`, `Planner` and both front ends, and would
-make the offline requirement in F16 impossible to satisfy.
+make the offline, air-gapped use case enabled by `OllamaAdapter` in F16 impossible to satisfy.
 
 **2. Which classes are involved?**
 `ILLMClient` (target interface) ← implemented by `OpenAIAdapter` and
@@ -2500,7 +2500,8 @@ from both front ends (2.10).
    never call a model. This is what makes those paths unit-testable and what
    lets the product degrade gracefully when the API is down.
 2. **Every model call passes through `ILLMClient`.** No feature may reference a
-   vendor SDK, which is the precondition for the offline requirement in F16.
+   vendor SDK, which is the precondition for the offline, air-gapped use
+   case enabled by `OllamaAdapter` in F16.
 3. **`ProgressTracker.record()` is the only way study state changes.** This is
    what keeps F09, F10, F11 and F12 consistent with each other.
 4. **`AgentController` is the only entry point for both front ends.** No Swing
