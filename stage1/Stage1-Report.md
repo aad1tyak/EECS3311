@@ -1506,8 +1506,6 @@ sequenceDiagram
         AC-->>CI: SummaryDTO
         CI-->>GUI: render(dto, cached=true)
     else cache miss
-        AC->>MM: recall("summary:" + materialId + ":STANDARD")
-        MM-->>AC: null  %% miss, proceed
         AC->>PL: plan("summarize", {materialId, length})
         PL->>PT: analyze()
         PL-->>AC: Plan[step1=search, step2=generate]
