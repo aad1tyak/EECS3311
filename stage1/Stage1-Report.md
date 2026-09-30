@@ -328,7 +328,7 @@ omission of design content.
 
 | # | Pattern | Concrete location in the diagram |
 |---|---|---|
-| 1 | **Facade** | `AgentController` hides Planner + ToolManager + LLMClient + MemoryManager behind 14 simple methods |
+| 1 | **Facade** | `AgentController` hides Planner + ToolManager + LLMClient + MemoryManager behind one method per user-level intent |
 | 2 | **Strategy** | `ITool` family — `FileTool` / `SearchTool` / `QuizTool` are interchangeable strategies selected at runtime by `ToolManager.resolve(capability)` |
 | 3 | **Factory Method** | `ToolFactory.create(type, config)` produces the right `ITool` without `ToolManager` knowing concrete classes |
 | 4 | **Observer** | `ProgressTracker` o-- `0..* ProgressListener`, implemented by `ReminderService` and `StudyAgentGUI` |
@@ -375,7 +375,7 @@ any future front end.
 - *Subsystem classes* — `Planner`, `ToolManager`, `LLMClient`,
   `MemoryManager`, `ProgressTracker`: keep their own logic and remain usable
   directly by unit tests and by the CLI.
-- *Client* — `GUIController` and `CLI`: know only the facade's 16 methods.
+- *Client* — `GUIController`, `CLI` and `AdminController`: know only the facade's public methods.
 
 **4. Why is it appropriate here?**
 The subsystem API is intentionally wide and the correct *order* is the real
@@ -549,7 +549,7 @@ generates a quiz on the wrong topic has no recourse but to start over.
 `Command` (interface: `getName()`, `execute()`, `undo()`, `isUndoable()`);
 `SummarizeCommand`, `QuizCommand`, `ExportCommand` (concrete commands);
 `CommandInvoker` (holds `Deque<Command> history`, `execute/undo/redo`);
-invoked from `GUIController` and `CLI`.
+invoked from `GUIController`, `CLI` and `AdminController`.
 
 **3. What are the roles?**
 - *Command* — the abstraction for "an action with parameters and an inverse".
