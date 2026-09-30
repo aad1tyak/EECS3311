@@ -28,20 +28,23 @@ WTA --> PT: List<TopicScore> weak
 
 PT -> PT: notifyListeners(event)  \n iterates observers[]
 
-par fan-out to each observer, each in try/catch
+group fan-out — observer 1 (each in try/catch)
   PT -> PLST: notifyListeners(event)
   PLST -> GUI: onProgress(event)  \n polymorphic dispatch
   GUI -> GUI: append activity log entry
   GUI -> GUI: recompute mastery line chart
-  note over GUI
-    a chart failure is caught;
-    grading is not affected
-  end note
-and
+end
+
+group fan-out — observer 2 (each in try/catch)
   PLST -> RS: onProgress(event)  \n same call, second observer
   RS -> RS: recompute due flashcard counts
   RS -> SCH: schedule(nextReminder)
 end
+
+note over GUI
+  A chart failure is caught per-listener;
+  grading is not affected.
+end note
 
 note over GUI
   user opens Progress tab

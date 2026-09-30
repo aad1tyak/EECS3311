@@ -107,7 +107,7 @@ WTA --> PT: List<TopicScore> weak
 
 loop per topic in result
   PT -> ADC: step(topic, wasCorrect)
-  ADC -> ADC: window.add(outcome); <0.6 -> level-1, >0.8 -> level+1 (clamp 1..4)
+  ADC -> ADC: window.add(outcome); rate below 0.6 lowers level, above 0.8 raises (clamp 1..4)
 end
 
 PT --> GUI: onProgress(QUIZ_GRADED)
