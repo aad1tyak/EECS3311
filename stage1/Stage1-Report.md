@@ -1393,7 +1393,7 @@ described, covering all 16 features.
 
 ## 2.7 Sequence Diagrams
 
-Eight sequence diagrams covering the major flows. All participants are the real
+Nine sequence diagrams covering the major flows. All participants are the real
 class names from the class diagram, and every call is a method that actually
 exists on that class.
 
