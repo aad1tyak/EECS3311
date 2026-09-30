@@ -253,9 +253,11 @@ both central to the design.
 
 ![UML Class Diagram](diagrams/ClassDiagram.png)
 
-*Figure 2.3 — StudyMate class diagram: 50 types (35 concrete classes, 6
-interfaces, 9 supporting types), with attributes, key methods, relationship
-types and multiplicities. Editable source: `diagrams/ClassDiagram.puml`.*
+*Figure 2.3 — StudyMate class diagram: 54 types (48 concrete classes + 6
+interfaces), with attributes, key methods, relationship types and
+multiplicities. Every class named in the traceability table (2.8) and the CLI
+verb table (2.10.1) is declared here. Editable source:
+`diagrams/ClassDiagram.puml`.*
 
 
 
@@ -2466,11 +2468,12 @@ sequenceDiagram
 **Delivered:** a requirements analysis identifying users and the core problem
 (2.1); a 16-feature specification with the eight required fields each, covering
 deterministic, AI and hybrid classifications (2.2); a UML class diagram with
-36 classes (30 concrete + 6 interfaces), all relationship types and explicit
-multiplicities (2.3); **8 design patterns from the course list, exceeding the
-required minimum of 5**, each justified with the 5 required questions (2.4); a
-use-case diagram with 6 actors and 20 use cases including `«include»`/`«extend»`
-relationships (2.5); full template-structured descriptions of all 20 use cases
+54 types (48 concrete classes + 6 interfaces, including every class named in
+the feature traceability and CLI verb tables), all relationship types and
+explicit multiplicities (2.3); **8 design patterns from the course list,
+exceeding the required minimum of 5**, each justified with the 5 required
+questions (2.4); a use-case diagram with 6 actors and 20 use cases using proper
+UML `<<include>>` and `<<extend>>` stereotypes (2.5); full template-structured descriptions of all 20 use cases
 with alternative flows and postconditions (2.6); 9 sequence diagrams using real
 class and method names (2.7); a traceability table proving every feature
 reaches a use case, a sequence diagram and at least two patterns (2.8);
