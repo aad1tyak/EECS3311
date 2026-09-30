@@ -1855,6 +1855,7 @@ sequenceDiagram
     participant FT as FileTool
     participant MR as MaterialRepository
     participant PT as ProgressTracker
+    participant PLST as ProgressListener «interface»
     participant REM as ReminderService
 
     S->>GUI: click "Upload Material", choose lecture3.pdf
@@ -1887,9 +1888,10 @@ sequenceDiagram
             MR-->>AC: Material
             AC->>PT: record(MATERIAL_UPLOADED)
             PT->>PT: append(event), persist()
-            PT->>REM: notifyListeners(event) (Observer)
+            PT->>PLST: notifyListeners(event)  %% polymorphic fan-out
+            PLST->>REM: onProgress(event)  (ReminderService is an Observer)
             REM->>REM: refreshIndex()
-            PT-->>GUI: onProgress(event)
+            PLST->>GUI: onProgress(event)  (StudyAgentGUI is an Observer)
             GUI->>GUI: refreshMaterialList()
             GUI-->>S: "lecture3.pdf added (42 pages, 120 chunks)"
         end
@@ -1954,7 +1956,7 @@ sequenceDiagram
         LLM-->>AC: Completion(parsed)
         AC->>MM: remember("summary:" + materialId, dto)
         AC->>PT: record(SUMMARY_GENERATED)
-        PT-->>GUI: onProgress(event)
+        PT-->>GUI: onProgress(event)  %% via notifyListeners, any ProgressListener
         AC-->>CI: SummaryDTO
         CI-->>GUI: render(dto)
         GUI-->>S: summary + citations rendered
@@ -2128,7 +2130,7 @@ sequenceDiagram
         PT->>ADC: step(topic, wasCorrect)
         ADC->>ADC: window.add(outcome); successRate<0.6 → level-1, >0.8 → level+1 (clamp 1..4)
     end
-    PT->>GUI: onProgress(QUIZ_GRADED)
+    PT->>GUI: onProgress(QUIZ_GRADED)  %% via notifyListeners
     AC-->>GUI: render(gradeResult, perTopic, weakTopics, newLevels)
     GUI-->>S: score, per-question breakdown, weak topics, next difficulty
     end
@@ -2184,7 +2186,7 @@ sequenceDiagram
         end
         SCH-->>RS: List~Reminder~ pending
         AC->>PT: record(PLAN_GENERATED, sessionCount)
-        PT-->>GUI: onProgress(event)
+        PT-->>GUI: onProgress(event)  %% via notifyListeners
         AC-->>GUI: render(planTimeline)
         GUI-->>S: Day 1..N timeline, clickable sessions
     end
@@ -2282,8 +2284,9 @@ sequenceDiagram
     participant WTA as WeakTopicAnalyzer
     participant MM as MemoryManager
     participant REPO as IRepository~ProgressEvent~
-    participant GUI as StudyAgentGUI (Observer)
-    participant RS as ReminderService (Observer)
+    participant PLST as ProgressListener «interface»
+    participant GUI as StudyAgentGUI (implements PLST)
+    participant RS as ReminderService (implements PLST)
     participant SCH as ScheduledExecutorService
 
     Note over QT: grading finished elsewhere
@@ -2297,15 +2300,16 @@ sequenceDiagram
     PT->>PT: updateMastery(mastery)
     PT->>WTA: rank(mastery)
     WTA-->>PT: List~TopicScore~ weak
-    PT-->>PT: notifyListeners(event)
+    PT-->>PT: notifyListeners(event)  %% iterates observers[]
 
     par fan-out to each observer, each in try/catch
-        PT->>GUI: onProgress(event)
+        PT->>PLST: notifyListeners(event)
+        PLST->>GUI: onProgress(event)  %% polymorphic dispatch
         GUI->>GUI: append activity log entry
         GUI->>GUI: recompute mastery line chart
         Note over GUI: a chart failure is caught;<br/>grading is not affected
     and
-        PT->>RS: onProgress(event)
+        PLST->>RS: onProgress(event)  %% same call, second observer
         RS->>RS: recompute due flashcard counts
         RS->>SCH: schedule(nextReminder)
     end
@@ -2378,7 +2382,7 @@ sequenceDiagram
             TF-->>AC: Path saved
             AC->>MEM: remember("lastExport", path)
             AC->>PT: record(REPORT_EXPORTED)
-            PT-->>GUI: onProgress(event)
+            PT-->>GUI: onProgress(event)  %% via notifyListeners
             AC-->>CI: Path
             CI-->>GUI: render(confirmation + "Open folder")
             GUI-->>S: "Saved to ~/Desktop/study-report.pdf"
