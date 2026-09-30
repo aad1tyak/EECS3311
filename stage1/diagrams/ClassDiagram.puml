@@ -1,0 +1,441 @@
+@startuml ClassDiagram
+' StudyMate — Stage 1 Class Diagram
+' Render:  plantuml ClassDiagram.puml  ->  ClassDiagram.png / .svg
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #1F5FA8
+  ArrowColor #333333
+}
+
+title StudyMate — UML Class Diagram (Stage 1)
+
+' ============================== INTERFACES ==============================
+
+interface View {
+  +render(r : Result) : void
+  +showError(e : AppError) : void
+  +showProgress(msg : String, pct : int) : void
+}
+
+interface ITool {
+  +getName() : String
+  +getDescription() : String
+  +getParameters() : ParameterSchema
+  +execute(ctx : ToolContext, params : Map) : ToolResult
+  +validate(params : Map) : boolean
+  +getCostEstimate() : int
+}
+
+interface ILLMClient {
+  +complete(prompt : Prompt) : Completion
+  +stream(prompt : Prompt) : Flux<String>
+  +embed(text : String) : Embedding
+  +getModelId() : String
+  +isAvailable() : boolean
+}
+
+interface "IRepository<T>" {
+  +save(entity : T) : T
+  +findById(id : String) : Optional<T>
+  +findAll() : List<T>
+  +findBy(p : Predicate) : List<T>
+  +delete(id : String) : boolean
+  +replaceAll(items : List<T>) : void
+}
+
+interface ProgressListener {
+  +onProgress(e : ProgressEvent) : void
+  +onStateChanged(s : AppState) : void
+}
+
+interface Command {
+  +getName() : String
+  +execute() : CommandResult
+  +undo() : void
+  +isUndoable() : boolean
+}
+
+' ============================ PRESENTATION ==============================
+
+class StudyAgentGUI {
+  -frame : JFrame
+  -materialPanel : MaterialListPanel
+  -chatPanel : ChatPanel
+  -progressPanel : ProgressChartPanel
+  -graphPanel : ConceptGraphPanel
+  -views : List<View>
+  +onUpload() : void
+  +onSummarize() : void
+  +onAskQuestion() : void
+  +onGenerateQuiz() : void
+  +onSubmitQuiz() : void
+  +onBuildStudyPlan() : void
+  +onViewProgress() : void
+  +onExportReport() : void
+  +onOpenSettings() : void
+  +{static} main(args : String[]) : void
+}
+
+class CLI {
+  -in : Scanner
+  -controller : AgentController
+  -invoker : CommandInvoker
+  -verbs : Map<String, CliVerb>
+  +start() : void
+  +registerCommands() : void
+  +dispatch(line : String) : void
+  +printHelp() : void
+  +render(r : Result) : void
+}
+
+class GUIController {
+  -gui : StudyAgentGUI
+  -controller : AgentController
+  +attach() : void
+  +onUploadClicked() : void
+  +onQuestionSubmit(q : String) : void
+}
+
+class AdminController {
+  -controller : AgentController
+  -course : Course
+  -canPublish : boolean
+  +onSeedCourse() : void
+  +onViewInsights() : void
+  +seedMaterials(dir : Path, dates : Set) : SeedResult
+  +getInsights(c : Course, r : DateRange) : CourseInsights
+  +publishRemediation(topic : String, m : Path) : void
+}
+
+' ============================== AGENT CORE ===============================
+
+class AgentController <<Facade>> {
+  -planner : Planner
+  -toolManager : ToolManager
+  -memory : MemoryManager
+  -llmClient : LLMClient
+  -invoker : CommandInvoker
+  -progressTracker : ProgressTracker
+  -config : AppConfig
+  +handleIntent(input : String) : Result
+  +uploadMaterial(file : Path) : MaterialDTO
+  +summarize(materialId : String, len : SummaryLength) : SummaryDTO
+  +extractConcepts(materialId : String) : List<Concept>
+  +askQuestion(question : String) : AnswerDTO
+  +buildStudyPlan(req : PlanRequest) : StudyPlan
+  +generateFlashcards(req : FlashcardRequest) : List<Flashcard>
+  +generateQuiz(req : QuizRequest) : Quiz
+  +gradeQuiz(attempt : QuizAttempt) : GradeResult
+  +getWeakTopics() : WeakTopicReport
+  +updateDifficulty(topic : String, automatic : boolean) : void
+  +getProgress(r : DateRange) : ProgressSnapshot
+  +getReminders() : List<Reminder>
+  +getConceptGraph() : ConceptGraph
+  +getHistory(f : HistoryFilter) : List<SessionRecord>
+  +exportReport(req : ExportRequest) : Path
+  +updateConfig(cfg : AppConfig) : void
+  +shutdown() : void
+}
+
+class Planner {
+  -memory : MemoryManager
+  -toolManager : ToolManager
+  -analyzer : WeakTopicAnalyzer
+  +plan(intent : String, args : Map) : Plan
+  +decompose(goal : Goal) : List<PlanStep>
+  +reorderByPriority(plan : Plan) : void
+  +isFeasible(plan : Plan) : boolean
+}
+
+class PlanStep {
+  +stepId : String
+  +toolName : String
+  +params : Map<String, Object>
+  +priority : int
+  +status : StepStatus
+  +error : String
+}
+
+class ToolManager <<Context>> {
+  -registry : Map<String, ITool>
+  -factory : ToolFactory
+  -callCounts : Map<String, Integer>
+  +register(tool : ITool) : void
+  +execute(toolName : String, ctx : ToolContext) : ToolResult
+  +listTools() : List<String>
+  +resolve(capability : String) : ITool
+}
+
+class ToolFactory <<Factory Method>> {
+  +create(type : String, config : Map) : ITool
+  +createFileTool() : FileTool
+  +createSearchTool() : SearchTool
+  +createQuizTool() : QuizTool
+}
+
+class FileTool {
+  -supportedExts : List<String>
+  -maxBytes : long
+  +parse(file : Path) : Material
+  +chunk(m : Material, size : int) : List<Chunk>
+  +write(path : String, content : String) : void
+  +validate(file : Path) : boolean
+}
+
+class SearchTool {
+  -repo : IRepository<Chunk>
+  -llm : ILLMClient
+  -lexical : BM25Index
+  +hybridSearch(q : String, k : int) : List<Chunk>
+  +reciprocalRankFusion(ranked : List<List<Chunk>>) : List<String>
+  +score(c : Chunk, q : String) : double
+}
+
+class QuizTool {
+  -engine : QuizEngine
+  -difficulty : AdaptiveDifficultyController
+  +generate(req : QuizRequest) : List<Question>
+  +buildPrompt(req : QuizRequest) : Prompt
+}
+
+' ============================ INTELLIGENCE ==============================
+
+class LLMClient <<Singleton>> {
+  -{static} instance : LLMClient
+  -adapter : ILLMClient
+  -promptBuilder : PromptBuilder
+  -parser : ResponseParser
+  -maxRetries : int
+  -temperature : double
+  +{static} getInstance() : LLMClient
+  +complete(p : Prompt) : Completion
+  +stream(p : Prompt) : Flux<String>
+  +setAdapter(a : ILLMClient) : void
+  +isHealthy() : boolean
+}
+
+class OpenAIAdapter {
+  -apiKey : String
+  -baseUrl : String
+  +complete(p : Prompt) : Completion
+  +stream(p : Prompt) : Flux<String>
+  +embed(t : String) : Embedding
+}
+
+class OllamaAdapter {
+  -host : String
+  -model : String
+  +complete(p : Prompt) : Completion
+  +stream(p : Prompt) : Flux<String>
+}
+
+class PromptBuilder {
+  -systemRole : String
+  -template : PromptTemplate
+  -maxContextTokens : int
+  +buildSummaryPrompt(m : Material, l : SummaryLength) : Prompt
+  +buildConceptPrompt(candidates : List<String>) : Prompt
+  +buildQA(q : String, ctx : List<Chunk>) : Prompt
+  +buildQuizPrompt(r : QuizRequest, difficulty : int) : Prompt
+  +buildFlashcardPrompt(c : Concept, count : int) : Prompt
+  +buildDiagnosisPrompt(weak : List<TopicScore>) : Prompt
+  +buildRubricPrompt(q : Question, answer : String) : Prompt
+}
+
+class ResponseParser {
+  -schema : JsonSchema
+  +parseCompletion(raw : String) : Completion
+  +parseConceptList(json : String) : List<Concept>
+  +parseQuiz(json : String) : Quiz
+  +parseFlashcards(json : String) : List<Flashcard>
+  +parseAnswer(raw : String, src : List<Chunk>) : AnswerDTO
+  +parseGrade(json : String) : GradeResult
+  +repair(malformed : String) : String
+}
+
+' ============================== MEMORY/DATA ==============================
+
+class MemoryManager <<Singleton>> {
+  -{static} instance : MemoryManager
+  -history : ConversationHistory
+  -materials : IRepository<Material>
+  -events : IRepository<ProgressEvent>
+  -cards : IRepository<Flashcard>
+  -llmCache : Cache<String, String>
+  +{static} getInstance() : MemoryManager
+  +remember(key : String, value : String) : void
+  +recall(key : String) : String
+  +persistAll() : void
+  +loadAll() : void
+}
+
+class ConversationHistory {
+  -messages : List<Message>
+  -maxTokens : int
+  +add(m : Message) : void
+  +recentWindow(n : int) : List<Message>
+  +compress() : String
+}
+
+class MaterialRepository {
+  -delegate : IRepository<Material>
+  -conceptIndex : Map<String, List<Concept>>
+  +add(m : Material) : Material
+  +get(id : String) : Optional<Material>
+  +all() : List<Material>
+  +remove(id : String) : boolean
+  +conceptsFor(materialId : String) : List<Concept>
+}
+
+class QuizEngine {
+  -quizzes : Map<String, Quiz>
+  -normalizer : AnswerNormalizer
+  +register(q : Quiz) : Quiz
+  +grade(a : QuizAttempt) : GradeResult
+  +exactMatch(expected : String, actual : String) : double
+  +levenshteinRatio(a : String, b : String) : double
+}
+
+class ProgressTracker <<Subject>> {
+  -events : List<ProgressEvent>
+  -mastery : Map<String, Double>
+  -listeners : List<ProgressListener>
+  -analyzer : WeakTopicAnalyzer
+  +record(e : ProgressEvent) : void
+  +attach(l : ProgressListener) : void
+  +detach(l : ProgressListener) : void
+  +notifyListeners(e : ProgressEvent) : void
+  +analyze() : WeakTopicReport
+  +masteryOf(topic : String) : double
+}
+
+class WeakTopicAnalyzer {
+  -minAttempts : int
+  +compute(e : List<ProgressEvent>) : Map<String, Double>
+  +ema(scores : List<Double>, alpha : double) : double
+  +rank(m : Map<String, Double>) : List<TopicScore>
+}
+
+class AdaptiveDifficultyController {
+  -levels : Map<String, Integer>
+  -pinned : Map<String, Boolean>
+  -window : Window
+  +currentLevel(topic : String) : int
+  +step(topic : String, wasCorrect : boolean) : void
+  +nextLevel(topic : String) : int
+}
+
+class ReminderService {
+  -scheduler : ScheduledExecutorService
+  -pending : List<Reminder>
+  +schedule(r : Reminder) : void
+  +rescheduleAll(plan : List<StudySession>) : void
+  +snooze(reminderId : String, d : Duration) : void
+  +cancel(reminderId : String) : void
+}
+
+class AggregateAnalyticsService {
+  -repo : IRepository<ProgressEvent>
+  -minStudentsForAggregate : int
+  +compute(c : Course, r : DateRange) : CourseInsights
+  +topicMastery(c : Course) : Map<String, Double>
+  +classWideGaps(mastery : Map, threshold : double) : List<TopicScore>
+  +engagementFunnel(c : Course) : List<String>
+}
+
+class CommandInvoker {
+  -history : Deque<Command>
+  +execute(c : Command) : void
+  +undo() : void
+  +redo() : void
+}
+
+class SummarizeCommand {
+  +execute() : CommandResult
+  +undo() : void
+}
+class QuizCommand {
+  +execute() : CommandResult
+  +undo() : void
+}
+class ExportCommand {
+  +execute() : CommandResult
+  +undo() : void
+}
+
+' ============================ RELATIONSHIPS ==============================
+
+' Facade dependencies
+AgentController --> Planner : uses
+AgentController --> ToolManager : uses
+AgentController --> MemoryManager : uses
+AgentController --> LLMClient : uses
+AgentController --> CommandInvoker : uses
+AgentController *-- ProgressTracker
+
+' Presentation (MVC + Facade)
+StudyAgentGUI ..|> View
+CLI ..|> View
+AdminController ..|> View
+StudyAgentGUI *-- GUIController
+GUIController --> AgentController : calls
+CLI --> AgentController : calls
+CLI --> CommandInvoker : calls
+AdminController --> AgentController : reuses
+AdminController *-- AggregateAnalyticsService
+AggregateAnalyticsService --> "IRepository<T>" : aggregates
+AggregateAnalyticsService ..> MaterialRepository : reads
+
+' Planner
+Planner --> MemoryManager : queries
+Planner --> ToolManager : plans against
+Planner --> WeakTopicAnalyzer : uses
+Planner *-- "0..*" PlanStep
+
+' Strategy + Factory
+ToolManager o-- "0..*" ITool : registry
+ToolManager --> ToolFactory : creates
+ITool <|.. FileTool
+ITool <|.. SearchTool
+ITool <|.. QuizTool
+FileTool ..> MaterialRepository : saves via
+SearchTool --> MaterialRepository : searches
+SearchTool ..> ILLMClient : embeds via
+
+' Adapter + Singleton
+LLMClient ..|> ILLMClient
+LLMClient *-- PromptBuilder
+LLMClient *-- ResponseParser
+ILLMClient <|.. OpenAIAdapter
+ILLMClient <|.. OllamaAdapter
+LLMClient ..> OpenAIAdapter : delegates
+
+' Data
+MemoryManager *-- ConversationHistory
+MemoryManager ..> "IRepository<T>" : persists
+MaterialRepository ..|> "IRepository<T>"
+MemoryManager *-- MaterialRepository
+QuizEngine --> QuizTool
+QuizEngine ..> LLMClient : open-ended grading
+
+' Observer
+ProgressTracker --> WeakTopicAnalyzer
+ProgressTracker *-- "0..*" ProgressEvent
+ProgressTracker o-- "0..*" ProgressListener : notifies
+ReminderService ..|> ProgressListener
+StudyAgentGUI ..|> ProgressListener
+AdminController ..|> ProgressListener
+
+' Adaptive difficulty
+QuizTool --> AdaptiveDifficultyController
+
+' Command
+Command <|.. SummarizeCommand
+Command <|.. QuizCommand
+Command <|.. ExportCommand
+CommandInvoker o-- "0..*" Command
+
+@enduml

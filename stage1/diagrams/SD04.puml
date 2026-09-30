@@ -1,0 +1,117 @@
+@startuml SD04
+' SD04 — Generate Quiz then Auto Grade (UC-08 -> UC-10, F07/F08/F10)
+' The adaptive loop: generate at an inferred level, grade, adjust the level.
+
+title SD04 — Generate Quiz then Auto Grade (UC-08 -> UC-10)
+
+actor Student
+participant "StudyAgentGUI" as GUI
+participant "CommandInvoker" as CI
+participant "AgentController" as AC
+participant "Planner" as PL
+participant "ToolManager" as TM
+participant "QuizTool" as QT
+participant "AdaptiveDifficultyController" as ADC
+participant "SearchTool" as ST
+participant "PromptBuilder" as PB
+participant "LLMClient" as LLM
+participant "OpenAIAdapter" as OA
+participant "ResponseParser" as RP
+participant "QuizEngine" as QE
+participant "AnswerNormalizer" as AN
+participant "ProgressTracker" as PT
+participant "WeakTopicAnalyzer" as WTA
+
+== PHASE 1 — GENERATE ==
+
+Student -> GUI: open Quiz setup, scope=Graphs, n=10, Adaptive=on
+GUI -> CI: execute(QuizCommand(QuizRequest))
+CI -> AC: generateQuiz(req)
+AC -> PL: plan("quiz", req)
+
+alt topic pinned by user
+  PL -> ADC: nextLevel("Graphs")
+  ADC --> PL: pinnedLevel (use requested)
+else adaptive
+  PL -> ADC: nextLevel("Graphs")
+  ADC --> PL: 2 (Proficient)
+end
+
+PL -> TM: execute("quiz", ctx)
+TM -> QT: generate(req, level)
+QT -> ST: hybridSearch(topic, k)
+ST --> QT: List<Chunk>
+QT -> PB: buildQuizPrompt(req, level=2)
+PB --> QT: Prompt + JSON schema
+QT -> LLM: completeJson(Prompt)
+LLM -> OA: complete(Prompt)
+OA --> LLM: raw JSON
+LLM -> RP: parseQuiz(raw)
+
+loop per item validation
+  RP -> RP: 1 correct option, 4 distinct, no leakage, rationale present
+end
+
+alt items failed validation
+  RP -> LLM: repair(item)
+  LLM --> RP: repaired
+end
+
+RP --> QT: List<Question>
+QT --> AC: Quiz
+AC -> QE: registerQuiz(Quiz)
+AC -> PT: record(QUIZ_GENERATED)
+AC --> GUI: render(quiz, timer=off)
+
+== PHASE 2 — TAKE + GRADE ==
+
+Student -> GUI: answer 10 questions, click "Submit"
+GUI -> CI: execute(SubmitCommand(QuizAttempt))
+CI -> AC: gradeQuiz(attempt)
+AC -> QE: grade(QuizAttempt)
+
+loop MCQ / True-False
+  QE -> AN: exactMatch(expected, actual)
+  AN --> QE: true/false
+end
+
+loop Short answer
+  QE -> AN: normalize(actual)
+  QE -> AN: levenshteinRatio(expected, actual)
+  alt ratio >= 0.85
+    AN --> QE: 1.0
+  else 0.6 <= ratio < 0.85
+    AN --> QE: 0.5 + flag "partial"
+  else
+    AN --> QE: 0.0
+  end
+end
+
+loop Free response
+  QE -> LLM: completeJson(rubricPrompt)
+  LLM -> OA: complete(Prompt)
+  LLM -> RP: parseGrade(raw)
+  alt confidence < threshold
+    RP --> QE: flag "needs review"
+  end
+end
+
+QE --> AC: GradeResult(perItem, perTopic, total%)
+AC -> PT: record(QUIZ_GRADED, result)
+PT -> WTA: compute(events)
+WTA -> WTA: ema(scores, a=0.4), minAttempts=2
+WTA --> PT: Map<String, Double> mastery
+PT -> PT: updateMastery(mastery)
+PT -> WTA: rank(mastery)
+WTA --> PT: List<TopicScore> weak
+
+loop per topic in result
+  PT -> ADC: step(topic, wasCorrect)
+  ADC -> ADC: window.add(outcome); <0.6 -> level-1, >0.8 -> level+1 (clamp 1..4)
+end
+
+PT --> GUI: onProgress(QUIZ_GRADED)
+AC --> GUI: render(gradeResult, perTopic, weakTopics, newLevels)
+GUI --> Student: score, breakdown, weak topics, next difficulty
+
+@enduml

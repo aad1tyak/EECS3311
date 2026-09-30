@@ -1,0 +1,67 @@
+@startuml SD02
+' SD02 — Summarize Document (UC-03, F02)
+' The full agent loop: plan -> tool dispatch -> prompt build -> LLM -> parse -> memory -> notify.
+
+title SD02 — Summarize Document (UC-03, F02)
+
+actor Student
+participant "StudyAgentGUI" as GUI
+participant "CommandInvoker" as CI
+participant "AgentController" as AC
+participant "Planner" as PL
+participant "ToolManager" as TM
+participant "SearchTool" as ST
+participant "LLMClient" as LLM
+participant "OpenAIAdapter" as OA
+participant "PromptBuilder" as PB
+participant "ResponseParser" as RP
+participant "MemoryManager" as MM
+participant "ProgressTracker" as PT
+
+Student -> GUI: select lecture3.pdf, length=Standard, click "Summarize"
+GUI -> CI: execute(SummarizeCommand(materialId, STANDARD))
+CI -> AC: summarize(materialId, STANDARD)
+
+AC -> MM: recall("summary:" + materialId + ":STANDARD")
+
+alt cache hit
+  MM --> AC: SummaryDTO
+  AC --> CI: SummaryDTO
+  CI --> GUI: render(dto, cached=true)
+else cache miss
+  MM --> AC: null
+  AC -> PL: plan("summarize", {materialId, length})
+  PL -> PT: analyze()
+  PL --> AC: Plan[step1=search, step2=generate]
+
+  AC -> TM: execute("search", ctx)
+  TM -> ST: hybridSearch(materialId, topK)
+  ST -> ST: BM25 rank + RRF fuse
+  ST --> TM: List<Chunk> (within budget)
+  TM --> AC: ToolResult(chunks)
+
+  AC -> LLM: complete(Prompt)
+  LLM -> PB: buildSummaryPrompt(Material, STANDARD)
+  PB -> PB: truncate/fit to maxContextTokens
+  PB --> LLM: Prompt
+  LLM -> OA: complete(Prompt)
+  OA --> LLM: Completion(raw)
+  LLM -> RP: parseMarkdown(raw)
+  RP --> LLM: SummaryDTO + List<SectionRef>
+  LLM --> AC: Completion(parsed)
+
+  AC -> MM: remember("summary:" + materialId, dto)
+  AC -> PT: record(SUMMARY_GENERATED)
+  PT --> GUI: onProgress(event)  \n via notifyListeners
+  AC --> CI: SummaryDTO
+  CI --> GUI: render(dto)
+  GUI --> Student: summary + citations rendered
+end
+
+note right of LLM
+  On HTTP 429/5xx: retry x2 with backoff,
+  then LLMException -> showError("AI offline").
+  Deterministic features stay available.
+end note
+
+@enduml

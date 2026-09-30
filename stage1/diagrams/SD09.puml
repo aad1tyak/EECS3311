@@ -1,0 +1,53 @@
+@startuml SD09
+' SD09 — /ask from the CLI (UC-05 via CLI, F04)
+' Demonstrates that the CLI path converges on AgentController and is
+' thereafter identical to SD03.
+
+title SD09 — /ask from the CLI (UC-05 via CLI, F04)
+
+actor Student
+participant "CLI" as CLI
+participant "CommandInvoker" as INV
+participant "AgentController" as AC
+participant "Planner" as PL
+participant "ToolManager" as TM
+participant "SearchTool" as ST
+participant "LLMClient" as LLM
+participant "ResponseParser" as RP
+
+Student -> CLI: type "/ask how does BFS differ from DFS?" + Enter
+CLI -> CLI: registerCommands() lookup "/ask"
+CLI -> CLI: AskCommand.parse("how does BFS differ from DFS?")
+CLI -> INV: execute(AskCommand)
+INV -> AC: askQuestion("how does BFS differ from DFS?")
+
+note over CLI, AC
+  from here the path is
+  identical to SD03
+end note
+
+AC -> PL: plan("qa", {q})
+PL --> AC: Plan[step1=hybridSearch, step2=answer]
+AC -> TM: execute("search", ctx)
+TM -> ST: hybridSearch(q, topK=8)
+ST --> AC: List<Chunk> (ranked)
+
+alt top score below threshold
+  AC --> INV: AnswerDTO(notFound=true)
+else relevant
+  AC -> LLM: stream(Prompt)
+  LLM --> RP: parseAnswer(raw, chunks)
+  RP --> AC: AnswerDTO(text, citations, followUps)
+end
+
+AC --> INV: Result
+INV --> CLI: Result
+CLI -> CLI: BiConsumer renderer: print text + citation list
+CLI --> Student: answer printed to stdout, no GUI involved
+
+note over Student, AC
+  Same AgentController, same tools,
+  same validation as the GUI path
+end note
+
+@enduml

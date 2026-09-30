@@ -1,0 +1,95 @@
+@startuml SD06
+' SD06 — Extract Concepts, then Build the Concept Map (UC-04 -> UC-15, F03 + F13)
+
+title SD06 — Extract Concepts, then Concept Map (UC-04 -> UC-15)
+
+actor Student
+participant "StudyAgentGUI" as GUI
+participant "AgentController" as AC
+participant "ConceptExtractor" as CE
+participant "PromptBuilder" as PB
+participant "LLMClient" as LLM
+participant "ResponseParser" as RP
+participant "ConceptRegistry" as CR
+participant "MaterialRepository" as MR
+participant "ProgressTracker" as PT
+
+== EXTRACT CONCEPTS ==
+
+Student -> GUI: select lecture3.pdf, click "Extract Concepts"
+GUI -> AC: extractConcepts(materialId)
+AC -> CE: mineCandidates(text, topN=120)
+
+note over CE
+  Deterministic pre-pass:
+  sentence split, stop-words,
+  abbreviation filter, TF-IDF noun phrases
+end note
+
+CE --> AC: List<String> candidates
+AC -> PB: buildConceptPrompt(candidates)
+PB --> AC: Prompt
+AC -> LLM: completeJson(Prompt)
+LLM --> AC: raw JSON
+AC -> RP: parseConceptList(raw)
+
+loop per entry
+  RP -> RP: schema check, lowercase term, drop malformed
+end
+
+alt malformed JSON
+  AC -> RP: repair(raw)
+  RP --> AC: repaired
+end
+
+RP --> AC: List<Concept>
+
+loop each concept
+  AC -> CR: merge(term, definition, difficulty, page)
+  alt already exists
+    CR -> CR: addSource(materialId, page)
+  else new
+    CR -> CR: put(term, concept)
+  end
+end
+
+AC -> MR: saveConcepts(materialId, concepts)
+AC -> PT: record(CONCEPTS_EXTRACTED, count)
+AC --> GUI: render(conceptChips)
+
+== BUILD CONCEPT MAP ==
+
+participant "ConceptGraphBuilder" as CGB
+participant "ForceLayout" as FL
+participant "ConceptGraphPanel" as CGP
+
+Student -> GUI: open "Concept Map" tab
+GUI -> AC: getConceptGraph()
+AC -> CGB: build(concepts, mastery)
+CGB -> CGB: addNodes(colourBy=mastery)
+CGB -> CGB: deriveDeterministicEdges(coOccurrence, sharedMaterial)
+CGB -> LLM: completeJson(proposeEdges(unconnectedPairs))
+LLM --> CGB: List<Edge>{type, source, target, weight}
+
+loop per proposed edge
+  CGB -> CGB: reject self-loop
+  CGB -> CGB: reject prerequisite-of cycle (DFS check)
+  CGB -> CGB: dedupe (source, type, target)
+  CGB -> CGB: accept
+end
+
+alt node count > 300
+  CGB -> CGB: keep top 300 by TF-IDF, cluster remainder
+end
+
+CGB -> FL: compute(nodes, seed=42)
+FL --> CGB: Map<id, Point>
+CGB --> AC: ConceptGraph
+AC --> GUI: render(graph, layout)
+
+Student -> CGP: click node "BFS"
+CGP -> CGP: highlight prerequisite ancestors, filter materials
+Student -> CGP: click "Zoom to prerequisite chain"
+CGP -> CGP: fitView(ancestorSubgraph)
+
+@enduml

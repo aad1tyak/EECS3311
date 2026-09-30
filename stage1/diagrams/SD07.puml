@@ -1,0 +1,65 @@
+@startuml SD07
+' SD07 — View Progress: the Observer path in isolation (UC-11, F11 + F09)
+' No user action beyond opening a tab; all updates are pushes from the subject.
+
+title SD07 — View Progress: the Observer path (UC-11, F11 + F09)
+
+participant "QuizTool / QuizEngine" as QT
+participant "ProgressTracker\n(Subject)" as PT
+participant "WeakTopicAnalyzer" as WTA
+participant "MemoryManager" as MM
+participant "IRepository<ProgressEvent>" as REPO
+participant "ProgressListener\n(interface)" as PLST
+participant "StudyAgentGUI\n(implements PLST)" as GUI
+participant "ReminderService\n(implements PLST)" as RS
+participant "ScheduledExecutorService" as SCH
+
+note over QT: grading finished elsewhere
+QT -> PT: record(ProgressEvent{QUIZ_GRADED, topicScores})
+PT -> REPO: save(event)
+REPO --> PT: ok
+PT -> PT: append to events[]
+PT -> WTA: compute(events)
+WTA -> WTA: ema(a=0.4), minAttempts=2
+WTA --> PT: Map<String, Double> mastery
+PT -> PT: updateMastery(mastery)
+PT -> WTA: rank(mastery)
+WTA --> PT: List<TopicScore> weak
+
+PT -> PT: notifyListeners(event)  \n iterates observers[]
+
+par fan-out to each observer, each in try/catch
+  PT -> PLST: notifyListeners(event)
+  PLST -> GUI: onProgress(event)  \n polymorphic dispatch
+  GUI -> GUI: append activity log entry
+  GUI -> GUI: recompute mastery line chart
+  note over GUI
+    a chart failure is caught;
+    grading is not affected
+  end note
+and
+  PLST -> RS: onProgress(event)  \n same call, second observer
+  RS -> RS: recompute due flashcard counts
+  RS -> SCH: schedule(nextReminder)
+end
+
+note over GUI
+  user opens Progress tab
+  (pull, one-off)
+end note
+
+GUI -> PT: getMetrics(dateRange)
+PT -> MM: recall("metrics:" + range)
+
+alt cached
+  MM --> GUI: ProgressSnapshot
+else recompute
+  PT -> PT: aggregate(totalTime, quizzes, reviews, masteryHistory)
+  PT -> MM: remember("metrics:" + range, snapshot)
+  MM --> PT: stored
+  PT --> GUI: ProgressSnapshot
+end
+
+GUI -> GUI: renderTotals(), renderMasteryChart(), renderBarChart(), renderLog()
+
+@enduml

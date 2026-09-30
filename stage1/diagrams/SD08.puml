@@ -1,0 +1,76 @@
+@startuml SD08
+' SD08 — Export Study Report (UC-17, F15)
+' Fully deterministic: no LLM participant appears, by design.
+
+title SD08 — Export Study Report (UC-17, F15)
+
+actor Student
+participant "StudyAgentGUI" as GUI
+participant "CommandInvoker" as CI
+participant "AgentController" as AC
+participant "Planner" as PL
+participant "ProgressTracker" as PT
+participant "MaterialRepository" as MR
+participant "ReportRenderer" as RR
+participant "ToolManager" as TM
+participant "FileTool" as TF
+participant "MemoryManager" as MEM
+
+Student -> GUI: "Export Report" -> format=PDF, range=last 30 days
+GUI -> GUI: renderPreview(draftReport)
+Student -> GUI: click "Export", choose ~/Desktop/study-report.pdf
+GUI -> CI: execute(ExportCommand(ExportRequest))
+CI -> AC: exportReport(req)
+
+AC -> PL: plan("export", {range, sections})
+
+note over PL
+  Purely deterministic -
+  no LLM step
+end note
+
+PL --> AC: Plan[gather metrics, topics, weak, suggestions]
+AC -> PT: getMetrics(range)
+PT --> AC: ProgressSnapshot
+AC -> MR: all() + conceptsFor()
+MR --> AC: List<Material>, List<Concept>
+
+alt range contains no data
+  AC --> GUI: AppError("Nothing to export for this period")
+  GUI --> Student: "Nothing to export"
+else data present
+  AC -> RR: render(template, snapshot, materials, concepts, weak)
+
+  loop per section
+    RR -> RR: fill(section)
+    alt references removed material
+      RR -> RR: write "[material removed]"
+    end
+  end
+
+  RR --> AC: String content
+  AC -> TM: execute("file", {op: write})
+  TM -> TF: write(path, content)
+
+  alt path not writable / disk full
+    TF --> AC: IOException
+    TF -> TF: delete partial file
+    AC --> GUI: AppError(e)
+  else written
+    TF -> TF: verify sentinel header/footer
+    TF --> AC: Path saved
+    AC -> MEM: remember("lastExport", path)
+    AC -> PT: record(REPORT_EXPORTED)
+    PT --> GUI: onProgress(event)  \n via notifyListeners
+    AC --> CI: Path
+    CI --> GUI: render(confirmation + "Open folder")
+    GUI --> Student: "Saved to ~/Desktop/study-report.pdf"
+  end
+end
+
+Student -> GUI: Ctrl+Z (undo export)
+GUI -> CI: undo()
+CI -> TF: deleteFile(lastExport)
+CI --> GUI: render("Export undone")
+
+@enduml

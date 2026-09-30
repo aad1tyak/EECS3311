@@ -1,0 +1,143 @@
+@startuml UseCaseDiagram
+' StudyMate — Stage 1 Use-Case Diagram (proper UML notation)
+' Render:  plantuml UseCaseDiagram.puml  ->  UseCaseDiagram.png / .svg
+
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #1F5FA8
+  ArrowColor #333333
+}
+skinparam actor {
+  BorderColor #333333
+  BackgroundColor #E8E8F8
+}
+skinparam package {
+  BorderColor #999999
+  BackgroundColor #FAFAFA
+}
+
+title StudyMate — UML Use-Case Diagram (Stage 1)
+
+left to right direction
+
+' ============================== ACTORS ==============================
+
+actor Student <<primary>> as S
+actor Admin as A
+actor "LLM Service" as LLM
+actor "File System" as FS
+actor "Reminder Service" as RS
+actor "Clock / Scheduler" as CLK
+
+' ============================ SYSTEM BOUNDARY ==========================
+
+rectangle "StudyMate — Study Agent System" {
+
+  package "Material Management" {
+    usecase "UC-01\nUpload Learning\nMaterial" as UC01
+    usecase "UC-02\nManage Material\nLibrary" as UC02
+    usecase "UC-19\nSeed Course\nMaterials" as UC19
+    usecase "UC-20\nView Aggregate\nCourse Usage" as UC20
+  }
+
+  package "Comprehension & Retrieval" {
+    usecase "UC-03\nSummarize\nDocument" as UC03
+    usecase "UC-04\nExtract\nConcepts" as UC04
+    usecase "UC-05\nAsk Question\nabout Materials" as UC05
+  }
+
+  package "Practice & Assessment" {
+    usecase "UC-06\nGenerate\nFlashcards" as UC06
+    usecase "UC-07\nReview\nFlashcards" as UC07
+    usecase "UC-08\nGenerate Quiz" as UC08
+    usecase "UC-09\nTake Quiz" as UC09
+    usecase "UC-10\nAuto Grade\nQuiz" as UC10
+  }
+
+  package "Adaptation & Planning" {
+    usecase "UC-11\nView\nProgress" as UC11
+    usecase "UC-12\nIdentify\nWeak Topics" as UC12
+    usecase "UC-13\nBuild Personalized\nStudy Plan" as UC13
+  }
+
+  package "Engagement & Review" {
+    usecase "UC-14\nReceive Study\nReminder" as UC14
+    usecase "UC-15\nExplore\nConcept Map" as UC15
+    usecase "UC-16\nReview Session\nHistory" as UC16
+    usecase "UC-17\nExport Study\nReport" as UC17
+    usecase "UC-18\nConfigure LLM\nProvider" as UC18
+  }
+
+}
+
+' ====================== STUDENT ASSOCIATIONS ==========================
+
+S -- UC01
+S -- UC02
+S -- UC03
+S -- UC04
+S -- UC05
+S -- UC06
+S -- UC07
+S -- UC08
+S -- UC09
+S -- UC10
+S -- UC11
+S -- UC12
+S -- UC13
+S -- UC14
+S -- UC15
+S -- UC16
+S -- UC17
+S -- UC18
+
+' ========================= ADMIN ASSOCIATIONS =========================
+
+A -- UC19
+A -- UC20
+
+' ==================== EXTERNAL ACTOR ASSOCIATIONS ======================
+
+LLM -- UC03
+LLM -- UC04
+LLM -- UC05
+LLM -- UC06
+LLM -- UC08
+LLM -- UC10
+LLM -- UC12
+LLM -- UC15
+LLM -- UC18
+
+FS -- UC01
+FS -- UC02
+FS -- UC19
+FS -- UC16
+FS -- UC17
+
+CLK -- UC07
+CLK -- UC09
+CLK -- UC11
+CLK -- UC13
+CLK -- UC14
+
+RS -- UC14
+
+' ============================ INCLUDE ================================
+' <<include>> = the included use case ALWAYS runs (mandatory)
+
+UC09 ..> UC10 : <<include>>
+UC10 ..> UC12 : <<include>>
+UC13 ..> UC12 : <<include>>
+UC13 ..> UC11 : <<include>>
+UC04 ..> UC15 : <<include>>
+UC07 ..> UC11 : <<include>>
+UC20 ..> UC11 : <<include>>
+
+' ============================ EXTEND =================================
+' <<extend>> = the extension runs only under a condition
+
+UC08 <.. UC12 : <<extend>>\n[if adaptive difficulty ON]
+UC13 <.. UC14 : <<extend>>\n[if reminders enabled]
+
+@enduml

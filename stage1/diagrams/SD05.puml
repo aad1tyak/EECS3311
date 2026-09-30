@@ -1,0 +1,64 @@
+@startuml SD05
+' SD05 — Build Personalized Study Plan (UC-13, F05 + F12)
+' The planner does the arithmetic; the model does the wording.
+
+title SD05 — Build Personalized Study Plan (UC-13, F05 + F12)
+
+actor Student
+participant "StudyAgentGUI" as GUI
+participant "AgentController" as AC
+participant "Planner" as PL
+participant "WeakTopicAnalyzer" as WTA
+participant "ProgressTracker" as PT
+participant "PromptBuilder" as PB
+participant "LLMClient" as LLM
+participant "ResponseParser" as RP
+participant "SessionRepository" as SR
+participant "ReminderService" as RS
+participant "ReminderScheduler" as SCH
+
+Student -> GUI: "Build Study Plan" -> target=Fri, 2h/day, weight=High
+GUI -> AC: buildStudyPlan(PlanRequest)
+AC -> WTA: rank(mastery)
+WTA --> AC: List<TopicScore>\nweak=[Graphs 0.42, Sorting 0.55, Hashing 0.71]
+
+AC -> PL: plan("study-plan", req)
+
+note over PL
+  Deterministic arithmetic:
+  requiredMinutes = sum((1 - mastery) * weightFactor)
+end note
+
+PL -> PL: binPack into available day slots (SR interleaving)
+PL -> PL: isFeasible(plan)?
+
+alt insufficient capacity
+  PL --> AC: Plan{feasible=false, requiredHours, availableHours}
+  AC --> GUI: render(error + "extend deadline?")
+else feasible
+  PL -> PB: buildPlanPrompt(topics, daySlots)
+  PB --> PL: Prompt   \n descriptions only, not schedule
+  PL -> LLM: completeJson(Prompt)
+  LLM --> RP: raw
+  RP --> PL: Map<sessionId, description>
+  PL -> PL: reject unknown sessionIds, keep deterministic text
+  PL --> AC: Plan[0..n StudySession]
+  AC -> SR: save(sessions)
+  SR --> AC: List<StudySession> persisted
+
+  AC -> RS: rescheduleAll(sessions)
+  RS -> SCH: computeTriggers(sessions, now)
+  SCH -> SCH: sessionStart-15min, flashcardDue, dailyStreak
+
+  alt quietHoursActive(now)
+    SCH -> SCH: defer to window end
+  end
+
+  SCH --> RS: List<Reminder> pending
+  AC -> PT: record(PLAN_GENERATED, sessionCount)
+  PT --> GUI: onProgress(event)  \n via notifyListeners
+  AC --> GUI: render(planTimeline)
+  GUI --> Student: Day 1..N timeline, clickable sessions
+end
+
+@enduml

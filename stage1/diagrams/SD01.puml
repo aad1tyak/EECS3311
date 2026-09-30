@@ -1,0 +1,66 @@
+@startuml SD01
+' SD01 — Upload Learning Material (UC-01, F01)
+' Deterministic path only: no LLM participant appears, by design.
+
+title SD01 — Upload Learning Material (UC-01, F01)
+
+actor Student
+participant "StudyAgentGUI" as GUI
+participant "GUIController" as GC
+participant "CommandInvoker" as CI
+participant "AgentController" as AC
+participant "ToolFactory" as TF
+participant "ToolManager" as TM
+participant "FileTool" as FT
+participant "MaterialRepository" as MR
+participant "ProgressTracker" as PT
+participant "ProgressListener" as PLST
+participant "ReminderService" as REM
+
+Student -> GUI: click "Upload Material", choose lecture3.pdf
+GUI -> GC: onUploadClicked(Path file)
+GC -> CI: execute(UploadCommand(file))
+CI -> AC: uploadMaterial(Path file)
+
+AC -> TF: create("file", AppConfig)
+TF --> AC: FileTool(supportedExts, maxBytes)
+AC -> TM: register(tool)
+AC -> FT: validate(Path file)
+
+alt extension or size invalid
+  FT --> AC: ValidationError(REASON)
+  AC --> GC: AppError(REASON, supported types)
+  GC --> GUI: showError(e)
+  GUI --> Student: "Unsupported format / file too large"
+else valid
+  FT --> AC: true
+  AC -> FT: parse(Path file)
+  FT --> AC: Material(id, title, author, pageCount, text)
+  AC -> FT: chunk(Material m, chunkSize)
+  FT --> AC: List<Chunk>(120 chunks, overlap=64)
+
+  AC -> MR: add(Material m)
+  MR -> MR: computeSha256(), dedupe check
+
+  alt duplicate detected
+    MR --> AC: DUPLICATE(existingId)
+    AC --> GC: AppWarning("Already uploaded")
+    GC --> GUI: showWarning(...)
+  else new material
+    MR -> MR: persist() + index chunks
+    MR --> AC: Material
+    AC -> PT: record(MATERIAL_UPLOADED)
+    PT -> PT: append(event), persist()
+    PT -> PLST: notifyListeners(event)
+    PLST -> REM: onProgress(event)
+    REM -> REM: refreshIndex()
+    PLST -> GUI: onProgress(event)
+    GUI -> GUI: refreshMaterialList()
+    GUI --> Student: "lecture3.pdf added (42 pages, 120 chunks)"
+  end
+end
+
+AC --> GC: MaterialDTO
+GC --> GUI: render(dto)
+
+@enduml

@@ -1,0 +1,65 @@
+@startuml SD03
+' SD03 — Ask Question about Materials / RAG (UC-05, F04)
+
+title SD03 — Ask Question about Materials / RAG (UC-05, F04)
+
+actor Student
+participant "StudyAgentGUI" as GUI
+participant "GUIController" as GC
+participant "AgentController" as AC
+participant "MemoryManager" as MM
+participant "ConversationHistory" as CH
+participant "Planner" as PL
+participant "ToolManager" as TM
+participant "SearchTool" as ST
+participant "LLMClient" as LLM
+participant "OpenAIAdapter" as OA
+participant "PromptBuilder" as PB
+participant "ResponseParser" as RP
+participant "ProgressTracker" as PT
+
+Student -> GUI: type "How does BFS differ from DFS?" + Enter
+GUI -> GC: onQuestionSubmit(q)
+GC -> AC: askQuestion(q)
+AC -> CH: add(Message(user, q))
+
+AC -> PL: plan("qa", {q})
+PL --> AC: Plan[step1=hybridSearch, step2=answer]
+
+AC -> TM: execute("search", ctx)
+TM -> ST: hybridSearch(q, topK=8)
+ST -> LLM: embed(q)
+LLM -> OA: embed(q)
+OA --> ST: Vector(1536)
+ST -> ST: BM25(q) + dense(q) -> reciprocalRankFusion()
+ST --> AC: List<Chunk> (ranked)
+
+alt top score below threshold
+  AC --> GUI: AnswerDTO("Not found in your materials", noAnswer=true)
+  GUI --> Student: honest refusal + related topics
+else relevant chunks found
+  AC -> CH: recentWindow(6)
+  CH --> AC: List<Message>
+  AC -> LLM: stream(Prompt)
+  LLM -> PB: buildQA(q, chunks, history)
+  PB --> LLM: Prompt
+  LLM -> OA: stream(Prompt)
+  OA --> LLM: Flux<String> delta[0..n]
+
+  loop token by token
+    LLM --> GUI: onToken(t)
+  end
+
+  OA --> LLM: Flux complete
+  LLM -> RP: parseAnswer(raw, chunks)
+  RP -> RP: map [cite:N] -> Citation{materialId, page, snippet}
+  RP --> LLM: AnswerDTO(text, citations, followUps)
+  LLM --> AC: AnswerDTO
+  AC -> CH: add(Message(assistant, answer))
+  AC -> MM: remember("lastAnswerId", id)
+  AC -> PT: record(QUESTION_ASKED)
+  AC --> GUI: render(answer, citations, followUps)
+  GUI --> Student: answer + clickable citations + 3 follow-ups
+end
+
+@enduml
