@@ -1066,7 +1066,7 @@ flowchart TB
     ADM(["<b>Admin</b>"])
     LLMS["<b>LLM Service</b><br/>(external)"]
     FS[("<b>File System</b><br/>(external)")]
-    REM["<b>Reminder Service</b><br/>(external)")]
+    REM["<b>Reminder Service</b><br/>(external)"]
     CLK["<b>Clock / Scheduler</b><br/>(external)"]
 
     subgraph SYS["<b>StudyMate — Study Agent System</b>"]
