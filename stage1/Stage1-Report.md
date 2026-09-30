@@ -2195,7 +2195,7 @@ sequenceDiagram
     PT->>PT: updateMastery(weak)
     loop per topic in result
         PT->>ADC: step(topic, wasCorrect)
-        ADC->>ADC: window.add(outcome); successRate<0.6 → level-1, >0.8 → level+1 (clamp 1..4)
+        ADC->>ADC: window.add(outcome) — rate below 0.6 lowers level, above 0.8 raises (clamp 1..4)
     end
     PT->>GUI: onProgress(QUIZ_GRADED)  %% via notifyListeners
     AC-->>GUI: render(gradeResult, perTopic, weakTopics, newLevels)
@@ -2374,7 +2374,7 @@ sequenceDiagram
         PLST->>GUI: onProgress(event)  %% polymorphic dispatch
         GUI->>GUI: append activity log entry
         GUI->>GUI: recompute mastery line chart
-        Note over GUI: a chart failure is caught;<br/>grading is not affected
+        Note over GUI: a chart failure is caught,<br/>grading is not affected
     and
         PLST->>RS: onProgress(event)  %% same call, second observer
         RS->>RS: recompute due flashcard counts
