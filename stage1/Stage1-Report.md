@@ -553,14 +553,14 @@ invoked from `GUIController`, `CLI` and `AdminController`.
 
 **3. What are the roles?**
 - *Command* — the abstraction for "an action with parameters and an inverse".
-- *Concrete Command** — e.g. `QuizCommand` captures `(QuizRequest, Quiz previousQuiz)`.
+- **Concrete Command** — e.g. `QuizCommand` captures `(QuizRequest, Quiz previousQuiz)`.
   Its `execute()` delegates to `AgentController`, and its `undo()` restores the
   state captured at construction — restoring a *snapshot* rather than issuing a
   compensating LLM call, deliberately, to avoid double-charging and to keep
   undo deterministic.
-- *Invoker** — `CommandInvoker`: runs the command, pushes it onto the undo
+- **Invoker** — `CommandInvoker`: runs the command, pushes it onto the undo
   stack, and pops on `undo()`/`redo()`.
-- *Receiver** — `AgentController` and the repositories, which actually do the work.
+- **Receiver** — `AgentController` and the repositories, which actually do the work.
 
 **4. Why is it appropriate here?**
 Command is the right fit because the requests are already parameterised
