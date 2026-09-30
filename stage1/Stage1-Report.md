@@ -1871,10 +1871,9 @@ sequenceDiagram
     PT->>PT: updateMastery(mastery)
     PT->>WTA: rank(mastery)
     WTA-->>PT: List~TopicScore~ weak
-    PT-->>PT: notifyListeners(event)  %% iterates observers[]
+    PT->>PLST: notifyListeners(event)  %% called once, iterates observers[]
 
-    par fan-out to each observer, each in try/catch
-        PT->>PLST: notifyListeners(event)
+    par fan-out (each observer in its own try/catch)
         PLST->>GUI: onProgress(event)  %% polymorphic dispatch
         GUI->>GUI: append activity log entry
         GUI->>GUI: recompute mastery line chart
