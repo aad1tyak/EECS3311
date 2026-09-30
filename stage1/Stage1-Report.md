@@ -312,6 +312,18 @@ diagram in this report is therefore verified rather than assumed.
 | **Dependency** (`..>`) | `SearchTool ..> ILLMClient`; `FileTool ..> MaterialRepository`; `StudyAgentGUI ..> AppConfig` | Temporary "uses at compile time only" — parameter types, locals |
 | **Multiplicity** | `ToolManager o-- "0..*"`; `Planner *-- "0..*"`; `CommandInvoker o-- "0..*"` | 1 controller ↔ 0..n tools/steps/commands; each tool ↔ exactly 1 registry |
 
+**Scope note.** The diagram declares the 54 types that carry the architecture:
+every class named in the "Key classes" column of the traceability table (2.8)
+and every type in the CLI verb table (2.10.1). Eleven further leaf types appear
+only *inside* the per-feature flow narratives in 2.8 and 2.9 and are therefore
+omitted here for legibility — they have no relationships of their own and are
+each used by exactly one caller: `AppConfig`, `ConfigValidator`,
+`LLMAdapterFactory`, `ConceptRegistry`, `ConceptGraphBuilder`, `ConceptGraphPanel`,
+`ForceLayout`, `StudyAgentChartPanel`, `DesktopNotification`,
+`AnswerNormalizer`, and `ScheduledExecutorService` (the JDK type that
+`ReminderScheduler` wraps). This is a deliberate readability cut, not an
+omission of design content.
+
 ### The 8 design patterns visible in this diagram
 
 | # | Pattern | Concrete location in the diagram |
