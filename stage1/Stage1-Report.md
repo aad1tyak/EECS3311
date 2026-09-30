@@ -383,7 +383,7 @@ domain knowledge — retrieval must precede generation; grading must precede
 weak-topic analysis; grading must precede difficulty adjustment. That ordering
 knowledge belongs in one place that both front ends inherit, not in two places
 that can drift. It also gives the front ends a stable seam: adding a mobile or
-web client in Stage 3 means implementing nothing but the facade's existing
+web client in a future iteration means implementing nothing but the facade's existing
 contract. Facade is used instead of a single god-class because the subsystem
 classes stay independently testable — `PlannerTest` never constructs a facade.
 
@@ -429,7 +429,7 @@ are selected at runtime from data — the `toolName` field in a `PlanStep`
 produced by the `Planner`, not by a compile-time decision — and (c) they are
 interchangeable through a common signature. The payoff is concrete:
 `ToolManager` has a `Map`, not a `switch`, so adding a
-`TranslateTool` in Stage 3 is one new class plus one registry line and touches
+A `TranslateTool` in a future iteration is one new class plus one registry line and touches
 no existing code. The `getCostEstimate()` method exists because strategy
 objects must be introspectable by the planner to budget API spend before
 running a plan.
@@ -516,7 +516,7 @@ feeds back into the subject's own state.
 
 **4. Why is it appropriate here?**
 The event set is genuinely open-ended and the number of consumers will grow
-(badge system, sync-to-mobile, reporting in Stage 3), which is exactly the
+(badge system, sync-to-mobile, post-course reporting), which is exactly the
 Observer precondition. Notification is *asynchronous in effect* — the quiz
 results screen appears because grading finished, not because the results screen
 asked — so a push model matches the domain better than a pull model. It also
