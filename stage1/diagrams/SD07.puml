@@ -26,16 +26,15 @@ PT -> PT: updateMastery(mastery)
 PT -> WTA: rank(mastery)
 WTA --> PT: List<TopicScore> weak
 
-PT -> PT: notifyListeners(event)  \n iterates observers[]
+PT -> PLST: notifyListeners(event)  \n called once, iterates observers[]
 
-group fan-out — observer 1 (each in try/catch)
-  PT -> PLST: notifyListeners(event)
+group fan-out - observer 1 (each in try/catch)
   PLST -> GUI: onProgress(event)  \n polymorphic dispatch
   GUI -> GUI: append activity log entry
   GUI -> GUI: recompute mastery line chart
 end
 
-group fan-out — observer 2 (each in try/catch)
+group fan-out - observer 2 (each in try/catch)
   PLST -> RS: onProgress(event)  \n same call, second observer
   RS -> RS: recompute due flashcard counts
   RS -> SCH: schedule(nextReminder)
