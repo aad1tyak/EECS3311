@@ -637,7 +637,7 @@ Adapter is what makes that requirement *affordable*.
 Two subsystems are process-wide by nature. `LLMClient` holds an HTTP connection
 pool, API-key state, token-spend counters and a circuit breaker; `MemoryManager`
 holds the canonical material index, the conversation window, the progress event
-log and the persistence handles. If each of the ~14 features constructed its
+log and the persistence handles. If each of the 16 features constructed its
 own, the application would have many divergent copies of the truth.
 
 **2. Which classes are involved?**
