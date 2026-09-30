@@ -3,8 +3,9 @@
 
 **Stage:** 1 (Requirements & Design)
 **Date:** 2026-09-30
-**Team members:** Aaditya Tyagi
+**Author:** Aaditya Karamchandani (matches the repository git identity)
 **Language / Platform:** Java 21, Swing GUI, Maven, JUnit 5
+**Deliverables:** this report (`Stage1-Report.md`) + `diagrams/*.puml` diagram sources
 
 ---
 
@@ -693,6 +694,12 @@ Every diagram in this report exists in two forms:
 | `diagrams/SD09.puml` | CLI `/ask` | 2.10 |
 
 Render with `plantuml -tpng stage1/diagrams/*.puml`.
+
+All 12 Mermaid blocks in this report and all 11 PlantUML files were
+syntax-checked against a Mermaid 10.x / PlantUML renderer; all render cleanly.
+Two Mermaid parse errors were found and fixed during that check (`<` inside a
+sequence message being read as an HTML tag, and `;` acting as a statement
+terminator), so the diagrams in this file are verified rather than assumed.
 
 The Mermaid use-case diagram in 2.5 is a visual approximation, since Mermaid's
 `flowchart` has no native use-case notation and no `«include»`/`«extend»`
