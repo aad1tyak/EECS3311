@@ -135,6 +135,10 @@ class AgentController <<Facade>> {
   +getReminders() : List<Reminder>
   +getConceptGraph() : ConceptGraph
   +getHistory(f : HistoryFilter) : List<SessionRecord>
+  +getMaterials(filter : String) : List<Material>
+  +removeMaterial(id : String) : boolean
+  +getDueCards() : List<Flashcard>
+  +gradeCard(cardId : String, outcome : String) : void
   +exportReport(req : ExportRequest) : Path
   +updateConfig(cfg : AppConfig) : void
   +shutdown() : void
@@ -366,6 +370,137 @@ class ExportCommand {
   +undo() : void
 }
 
+' ====================== SUPPORTING DOMAIN / HELPER TYPES ================
+' Referenced from the feature-to-design traceability table (2.8) and the
+' CLI verb table (2.10.1). Kept here so every named class exists in one place.
+
+abstract class "Command" as CommandBase {
+  {abstract} getName() : String
+  {abstract} execute() : CommandResult
+  {abstract} undo() : void
+  isUndoable() : boolean
+}
+
+class UploadCommand {
+  +file : Path
+  +execute() : CommandResult
+  +undo() : void
+}
+class RemoveMaterialCommand {
+  +materialId : String
+  +execute() : CommandResult
+  +undo() : void
+}
+class ExtractConceptsCommand {
+  +materialId : String
+  +execute() : CommandResult
+  +undo() : void
+}
+class AskCommand {
+  +question : String
+  +execute() : CommandResult
+  +undo() : void
+}
+class FlashcardCommand {
+  +req : FlashcardRequest
+  +execute() : CommandResult
+  +undo() : void
+}
+class SubmitCommand {
+  +attempt : QuizAttempt
+  +execute() : CommandResult
+  +undo() : void
+}
+class PlanCommand {
+  +req : PlanRequest
+  +execute() : CommandResult
+  +undo() : void
+}
+class ShutdownCommand {
+  +execute() : CommandResult
+  +undo() : void
+}
+
+class "IRepository<T>" #PaleGreen {
+  +save(entity : T) : T
+  +findById(id : String) : Optional<T>
+  +findAll() : List<T>
+  +findBy(p : Predicate) : List<T>
+  +delete(id : String) : boolean
+}
+
+class SessionRepository {
+  -delegate : IRepository<StudySession>
+  +openSession(topic : String) : StudySession
+  +appendActivity(a : SessionActivity) : void
+  +closeSession(at : Date) : void
+  +findBy(filter : HistoryFilter) : List<SessionRecord>
+}
+
+class FlashcardRepository {
+  -delegate : IRepository<Flashcard>
+  +due(at : Instant) : List<Flashcard>
+  +scheduleDue(card : Flashcard) : void
+  +recordOutcome(cardId : String, o : String) : void
+}
+
+class ConceptExtractor {
+  -stopWords : Set<String>
+  +mineCandidates(text : String, topN : int) : List<String>
+  +segment(text : String) : List<String>
+  +tfidf(candidates : List<String>) : Map<String, Double>
+}
+
+class ConceptGraph {
+  -nodes : Map<String, Concept>
+  -edges : List<Edge>
+  +addNode(c : Concept) : void
+  +addEdge(source : String, type : String, target : String, w : double) : boolean
+  +neighbours(id : String) : List<Edge>
+  +ancestors(id : String) : Set<String>
+}
+
+class ReportRenderer {
+  -template : Template
+  +render(tpl : Template, data : Map) : String
+  +fillSection(name : String, data : Map) : String
+}
+
+class ReminderScheduler {
+  -clock : Clock
+  +computeTriggers(sessions : List, now : Instant) : List<Reminder>
+  +deferForQuietHours(r : Reminder, cfg : AppConfig) : Reminder
+}
+
+class BM25Index {
+  -k1 : double
+  -b : double
+  +index(chunks : List<Chunk>) : void
+  +search(q : String, k : int) : List<Chunk>
+  +score(chunk : Chunk, terms : List<String>) : double
+}
+
+class Keychain {
+  -provider : String
+  +store(alias : String, secret : String) : void
+  +retrieve(alias : String) : Optional<String>
+  +isAvailable() : boolean
+}
+
+class WeakTopicReport {
+  +mastery : Map<String, Double>
+  +weak : List<TopicScore>
+  +diagnoses : List<Diagnosis>
+  +generatedAt : Instant
+}
+
+class CliVerb {
+  +name : String
+  +argSpec : List<String>
+  +build : Supplier<Command>
+  +render : BiConsumer<AgentController, Result>
+}
+
 ' ============================ RELATIONSHIPS ==============================
 
 ' Facade dependencies
@@ -436,6 +571,32 @@ QuizTool --> AdaptiveDifficultyController
 Command <|.. SummarizeCommand
 Command <|.. QuizCommand
 Command <|.. ExportCommand
+Command <|.. UploadCommand
+Command <|.. RemoveMaterialCommand
+Command <|.. ExtractConceptsCommand
+Command <|.. AskCommand
+Command <|.. FlashcardCommand
+Command <|.. SubmitCommand
+Command <|.. PlanCommand
+Command <|.. ShutdownCommand
 CommandInvoker o-- "0..*" Command
+
+' Supporting types
+SessionRepository ..|> "IRepository<T>"
+FlashcardRepository ..|> "IRepository<T>"
+MemoryManager *-- SessionRepository
+MemoryManager *-- FlashcardRepository
+SearchTool *-- BM25Index
+AgentController --> ConceptExtractor : uses
+AgentController --> ConceptGraph : returns
+AgentController --> WeakTopicReport : returns
+AgentController ..> SessionRepository
+AgentController ..> FlashcardRepository
+AgentController ..> ReportRenderer
+ReminderService *-- ReminderScheduler
+AgentController ..> Keychain : stores API key
+AgentController *-- CliVerb : registry for CLI verbs
+CliVerb ..> Command : builds
+CLI o-- "0..*" CliVerb
 
 @enduml
