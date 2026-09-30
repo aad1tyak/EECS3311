@@ -1931,6 +1931,8 @@ sequenceDiagram
         AC-->>CI: SummaryDTO
         CI-->>GUI: render(dto, cached=true)
     else cache miss
+        AC->>MM: recall("summary:" + materialId + ":STANDARD")
+        MM-->>AC: null  %% miss, proceed
         AC->>PL: plan("summarize", {materialId, length})
         PL->>PT: analyze()
         PL-->>AC: Plan[step1=search, step2=generate]
@@ -1942,7 +1944,6 @@ sequenceDiagram
         ST-->>TM: List~Chunk~ (within budget)
         TM-->>AC: ToolResult(chunks)
         AC->>LLM: complete(Prompt)
-        LLM->>MM: recall("summary:...")  %% second-level cache check
         LLM->>PB: buildSummaryPrompt(Material, STANDARD)
         PB->>PB: truncate/fit to maxContextTokens
         PB-->>LLM: Prompt
