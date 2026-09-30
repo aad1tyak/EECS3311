@@ -3,9 +3,10 @@
 
 **Stage:** 1 (Requirements & Design)
 **Date:** 2026-09-30
-**Author:** Aaditya Karamchandani (matches the repository git identity)
+**Team members:** Aaditya Karamchandani (solo — submitted individually)
+**Author / contact:** Aaditya Karamchandani, matching the repository git identity
 **Language / Platform:** Java 21, Swing GUI, Maven, JUnit 5
-**Deliverables:** this report (`Stage1-Report.md`) + `diagrams/*.puml` diagram sources
+**Deliverables:** this report (`Stage1-Report.md`) + `diagrams/*.puml` diagram sources + `diagrams/*.png` rendered diagrams
 
 ---
 
