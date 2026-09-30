@@ -224,8 +224,9 @@ call, fully unit-testable), or **Hybrid** (deterministic core with an AI layer).
 | **F15** | Export Study Report | Produces a shareable study report (Markdown / PDF) covering progress, mastery per topic, weak areas, and the recommended next steps. | "Export Report" button opens a save dialog with format (Markdown/PDF) and section checkboxes; a preview pane shows the report before saving. | Date range; selected sections; `ProgressTracker` metrics; `Concept` set; study plan | File written to disk (`.md` or `.pdf`) via `FileTool.write()`; confirmation with the saved path and option to open the containing folder | **Deterministic (template rendering; no LLM)** | `StudyAgentGUI.onExportReport()` → `AgentController.exportReport()` → `Planner.plan("export", range, sections)` → deterministic data gathering from `ProgressTracker`/`MaterialRepository` → `ReportRenderer` (Velocity/FreeMarker template, or a hand-rolled `StringBuilder` writer) → `FileTool.write()` → confirmation dialog | Target path not writable / permission denied → error with a suggestion to choose another location; no data in the selected range → "nothing to export" rather than an empty file; unknown extension → forced to `.md`; disk full → exception surfaced, partial file removed; a report section references a deleted material → rendered as "[material removed]" |
 | **F16** | Configuration & LLM Provider Settings | Lets the user choose the LLM provider and model, set API credentials, and configure retrieval and generation parameters. | Settings dialog (provider dropdown: OpenAI / Ollama, model field, API key field stored in the OS keychain, temperature, top-k retrieval count, chunk size). | Provider choice; model id; API key; `RetrievalConfig` parameters | Persisted `AppConfig`; `LLMAdapter` re-bound to the selected provider at runtime without restart | **Hybrid** — deterministic config persistence and validation, Adapter-based provider swapping | `StudyAgentGUI.onOpenSettings()` → `AgentController.updateConfig()` → `ConfigValidator` (checks key presence, model id format, numeric bounds) → `AppConfig` persisted → `LLMAdapterFactory.create(config)` returns the matching `ILLMClient` → existing `LLMClient` reference swapped → Observer notifies open sessions | Missing/invalid API key → provider-specific error, save blocked; unreachable Ollama host → connection test on save, warning shown but config kept; temperature or top-k out of range → clamped with a notice; config file unreadable → defaults loaded, backup written; swap fails at runtime → previous provider retained, error surfaced |
 
-**Feature count: 16** (15 functional features F01–F15, plus F16 configuration
-supporting the AI features).
+**Feature count: 16** — **F01–F15 are the 15 meaningful features** required by
+the specification; F16 is a supporting configuration capability that exists to
+serve them, and is not counted toward the feature total.
 
 ### Feature type distribution
 
@@ -324,9 +325,13 @@ direction LR
     class CLI {
         -Scanner in
         -AgentController controller
+        -CommandInvoker invoker
+        -Map~String,CliVerb~ verbs
         +void start()
         +void registerCommands()
+        +void dispatch(String line)
         +void printHelp()
+        +void render(Result r)
     }
 
     class GUIController {
@@ -1861,6 +1866,7 @@ exists on that class.
 | SD06 | UC-04 Extract Concepts + UC-15 Concept Map | F03, F13 | + `ConceptGraphBuilder`, `ConceptRegistry`, `ForceLayout` |
 | SD07 | UC-11 View Progress (Observer) | F09, F11 | `ProgressTracker`, `WeakTopicAnalyzer`, `StudyAgentGUI`, `ReminderService` |
 | SD08 | UC-17 Export Report (Command + FileTool) | F15 | + `ReportRenderer`, `FileTool` |
+| SD09 | UC-05 via the CLI front end | F04 | + `CLI`, `CommandInvoker` — proves both front ends converge on one controller |
 
 ---
 
@@ -2431,7 +2437,7 @@ appear.
 | **F01** | Upload learning material | Deterministic | UC-01, UC-02 | `StudyAgentGUI`, `GUIController`, `CommandInvoker`, `UploadCommand`, `AgentController`, `ToolFactory`, `ToolManager`, `FileTool`, `MaterialRepository`, `ProgressTracker` | `onUpload()`, `uploadMaterial(Path)`, `create("file", cfg)`, `validate(Path)`, `parse(Path)`, `chunk(Material,int)`, `add(Material)`, `record(ProgressEvent)`, `notifyListeners(ProgressEvent)` | SD01 | Facade, Strategy, Factory Method, Observer, Command, MVC |
 | **F02** | Document summarization | AI | UC-03 | `AgentController`, `Planner`, `PlanStep`, `ToolManager`, `SearchTool`, `LLMClient`, `OpenAIAdapter`, `PromptBuilder`, `ResponseParser`, `MemoryManager`, `SummarizeCommand` | `summarize(String,SummaryLength)`, `plan("summarize",args)`, `execute("search",ctx)`, `hybridSearch(String,int)`, `buildSummaryPrompt(Material,SummaryLength)`, `complete(Prompt)`, `parseMarkdown(String)`, `remember(k,v)`, `recall(k)`, `undo()` | SD02 | Facade, Strategy, Singleton, Adapter, Command |
 | **F03** | Concept extraction | Hybrid | UC-04, UC-19 | `AgentController`, `ConceptExtractor`, `PromptBuilder`, `LLMClient`, `ResponseParser`, `ConceptRegistry`, `MaterialRepository`, `ProgressTracker` | `extractConcepts(String)`, `mineCandidates(String,int)`, `buildConceptPrompt(List)`, `completeJson(Prompt)`, `parseConceptList(String)`, `merge(term,def,page)`, `addSource(materialId,page)`, `saveConcepts(materialId,List)`, `record(event)` | SD06 | Facade, Singleton, Adapter, Repository, Pipeline |
-| **F04** | Q&A over materials (RAG) | AI + retrieval | UC-05 | `StudyAgentGUI`, `GUIController`, `AgentController`, `Planner`, `ToolManager`, `SearchTool`, `BM25Index`, `LLMClient`, `OpenAIAdapter`, `PromptBuilder`, `ResponseParser`, `ConversationHistory`, `MemoryManager` | `askQuestion(String)`, `plan("qa",args)`, `hybridSearch(String,int)`, `reciprocalRankFusion(List)`, `embed(String)`, `stream(Prompt)`, `buildQA(String,List,List)`, `parseAnswer(String,List)`, `recentWindow(int)`, `compress()` | SD03 | Facade, Strategy, Singleton, Adapter, Observer |
+| **F04** | Q&A over materials (RAG) | AI + retrieval | UC-05 | `StudyAgentGUI`, `GUIController`, `CLI`, `AgentController`, `Planner`, `ToolManager`, `SearchTool`, `BM25Index`, `LLMClient`, `OpenAIAdapter`, `PromptBuilder`, `ResponseParser`, `ConversationHistory`, `MemoryManager` | `askQuestion(String)`, `plan("qa",args)`, `hybridSearch(String,int)`, `reciprocalRankFusion(List)`, `embed(String)`, `stream(Prompt)`, `buildQA(String,List,List)`, `parseAnswer(String,List)`, `recentWindow(int)`, `compress()` | SD03, SD09 (CLI) | Facade, Strategy, Singleton, Adapter, Observer, MVC |
 | **F05** | Personalized study plan | Hybrid (AI + planner) | UC-13, UC-19 | `AgentController`, `Planner`, `PlanStep`, `WeakTopicAnalyzer`, `PromptBuilder`, `LLMClient`, `ResponseParser`, `SessionRepository`, `ReminderService`, `ProgressTracker` | `buildStudyPlan(PlanRequest)`, `decompose(Goal)`, `reorderByPriority(Plan)`, `isFeasible(Plan)`, `rank(Map)`, `buildPlanPrompt(List,List)`, `completeJson(Prompt)`, `save(List)`, `rescheduleAll(List)`, `record(event)` | SD05 | Facade, Observer, Strategy, Singleton, Repository |
 | **F06** | Flashcard generation | AI | UC-06 | `AgentController`, `Planner`, `ToolManager`, `QuizTool`, `PromptBuilder`, `LLMClient`, `ResponseParser`, `FlashcardRepository`, `AdaptiveDifficultyController`, `ReminderService` | `generateFlashcards(FlashcardRequest)`, `generate(req,level)`, `currentLevel(topic)`, `buildFlashcardPrompt(Concept,int)`, `completeJson(Prompt)`, `parseFlashcards(String)`, `save(List)`, `scheduleDue(card)` | SD02 (generation chain), SD07 (review events) | Facade, Strategy, Factory Method, Adapter, Observer |
 | **F07** | Quiz generation | AI | UC-08, UC-09 | `AgentController`, `Planner`, `ToolManager`, `QuizTool`, `SearchTool`, `AdaptiveDifficultyController`, `PromptBuilder`, `LLMClient`, `ResponseParser`, `QuizEngine`, `QuizCommand` | `generateQuiz(QuizRequest)`, `plan("quiz",req)`, `nextLevel(topic)`, `generate(req,level)`, `buildQuizPrompt(QuizRequest,int)`, `completeJson(Prompt)`, `parseQuiz(String)`, `registerQuiz(Quiz)`, `undo()` | SD04 (Phase 1) | Facade, Strategy, Factory Method, Command, Adapter |
@@ -2454,7 +2460,7 @@ appear.
 | Every feature maps to ≥1 sequence diagram | 16 / 16 ✓ |
 | Every feature names ≥2 design patterns | 16 / 16 ✓ |
 | Use cases UC-01…UC-20 all referenced | 20 / 20 ✓ |
-| Sequence diagrams SD01–SD08 all referenced | 8 / 8 ✓ |
+| Sequence diagrams SD01–SD09 all referenced | 9 / 9 ✓ |
 | Deterministic features with a JUnit test plan | F01, F08, F11, F14, F15 ✓ |
 
 ## 2.9 Feature Implementation Explanations
@@ -2825,20 +2831,125 @@ provider is retained so the application keeps working.
 
 ---
 
-## 2.10 Stage 1 Summary
+## 2.10 CLI Interface
+
+The Stage 1 specification requires a command-line interface through which users
+can access the major functionality of the agent. `CLI` is therefore a full peer
+of `StudyAgentGUI`, not a stub: both implement the `View` interface and both
+reach every feature through the same `AgentController`.
+
+**All CLI commands construct the same `Command` objects as the GUI and dispatch
+through the same `CommandInvoker`, so every feature F01–F16 is reachable from
+both front ends and the two can never diverge.**
+
+### 2.10.1 Verb-to-method mapping
+
+| CLI verb | Arguments | Builds | Dispatches to | Features |
+|---|---|---|---|---|
+| `/upload <path>` | file path | `UploadCommand` | `uploadMaterial(Path)` | F01 |
+| `/materials` | `[filter]` | — | `getMaterials(filter)` | F01, F14 |
+| `/remove <materialId>` | id | `RemoveMaterialCommand` | `removeMaterial(String)` | F01 |
+| `/summarize <materialId> [brief\|standard\|detailed]` | id, length | `SummarizeCommand` | `summarize(String,SummaryLength)` | F02 |
+| `/concepts <materialId>` | id | `ExtractConceptsCommand` | `extractConcepts(String)` | F03, F13 |
+| `/map [topic]` | optional topic | — | `getConceptGraph()` | F13 |
+| `/ask <question>` | free text | `AskCommand` | `askQuestion(String)` | F04 |
+| `/cards <materialId> [count] [recall\|cloze]` | id, count, style | `FlashcardCommand` | `generateFlashcards(FlashcardRequest)` | F06 |
+| `/review` | — | — | `getDueCards()`, `gradeCard(...)` | F06, F11 |
+| `/quiz [scope] [count] [difficulty]` | scope, count, level | `QuizCommand` | `generateQuiz(QuizRequest)` | F07, F10 |
+| `/submit` | — | `SubmitCommand` | `gradeQuiz(QuizAttempt)` | F08, F09 |
+| `/progress [range]` | date range | — | `getProgress(DateRange)` | F11, F09 |
+| `/weak` | — | — | `getWeakTopics()` | F09, F10 |
+| `/plan <targetDate> <hoursPerDay>` | date, hours | `PlanCommand` | `buildStudyPlan(PlanRequest)` | F05, F12 |
+| `/reminders` | — | — | `getReminders()` | F12 |
+| `/history [filter]` | filter | — | `getHistory(HistoryFilter)` | F14 |
+| `/export <path> [md\|pdf]` | path, format | `ExportCommand` | `exportReport(ExportRequest)` | F15 |
+| `/config <provider> <model> [key]` | provider, model, key | — | `updateConfig(AppConfig)` | F16 |
+| `/undo` / `/redo` | — | — | `CommandInvoker.undo()` / `.redo()` | all undoable |
+| `/help` | — | — | `printHelp()` | — |
+| `/quit` | — | `ShutdownCommand` | `shutdown()` | — |
+
+`registerCommands()` builds a `Map<String, CliVerb>` at startup, where each
+`CliVerb` holds a name, an argument parser, a `Command` supplier and a
+`BiConsumer<AgentController, Result>` renderer. Adding a verb is a single map
+entry; it never touches `AgentController` or any subsystem.
+
+### 2.10.2 Shared-controller guarantee
+
+Because the CLI is a `View` and nothing more, it holds a reference to
+`AgentController` and `CommandInvoker` and nothing else. Concretely this means:
+
+- no parsing, no retrieval, no LLM call, and no persistence logic lives in
+  `CLI.start()`;
+- the `Command` objects it constructs are the same types the GUI constructs, so
+  `/quiz graphs 10 adaptive` and the GUI's "Generate Quiz" button execute
+  byte-for-byte the same path through `Planner` → `ToolManager` → `QuizTool`;
+- undo/redo behaves identically in both front ends, because both call the same
+  `CommandInvoker`;
+- the CLI is the headless entry point, so the same functionality is available
+  for scripting, automated testing, and remote or SSH sessions where a GUI
+  cannot run.
+
+### 2.10.3 SD09 — `/ask` from the CLI (UC-05 via CLI, F04)
+
+Shown to demonstrate that the CLI path converges on `AgentController` at step 3
+and is thereafter identical to SD03.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor S as Student
+    participant CLI as CLI
+    participant INV as CommandInvoker
+    participant AC as AgentController
+    participant PL as Planner
+    participant TM as ToolManager
+    participant ST as SearchTool
+    participant LLM as LLMClient
+    participant RP as ResponseParser
+
+    S->>CLI: type "/ask how does BFS differ from DFS?" + Enter
+    CLI->>CLI: registerCommands() lookup "/ask"
+    CLI->>CLI: AskCommand.parse("how does BFS differ from DFS?")
+    CLI->>INV: execute(AskCommand)
+    INV->>AC: askQuestion("how does BFS differ from DFS?")
+    Note over CLI,AC: from here the path is identical to SD03
+    AC->>PL: plan("qa", {q})
+    PL-->>AC: Plan[step1=hybridSearch, step2=answer]
+    AC->>TM: execute("search", ctx)
+    TM->>ST: hybridSearch(q, topK=8)
+    ST-->>AC: List~Chunk~ (ranked)
+    alt top score below threshold
+        AC-->>INV: AnswerDTO(notFound=true)
+    else relevant
+        AC->>LLM: stream(Prompt)
+        LLM-->>RP: parseAnswer(raw, chunks)
+        RP-->>AC: AnswerDTO(text, citations, followUps)
+    end
+    AC-->>INV: Result
+    INV-->>CLI: Result
+    CLI->>CLI: BiConsumer renderer: print text + citation list
+    CLI-->>S: answer printed to stdout, no GUI involved
+    Note over S,AC: Same AgentController, same tools,<br/>same validation as the GUI path
+```
+
+---
+
+## 2.11 Stage 1 Summary
 
 **Delivered:** a requirements analysis identifying users and the core problem
 (2.1); a 16-feature specification with the eight required fields each, covering
 deterministic, AI and hybrid classifications (2.2); a UML class diagram with
-22 classes, 6 interfaces, all relationship types and explicit multiplicities
-(2.3); explanations of 8 design patterns, each answering the 5 required
-questions (2.4); a use-case diagram with 6 actors and 20 use cases including
-`«include»`/`«extend»` relationships (2.5); full template-structured
-descriptions of all 20 use cases with alternative flows and postconditions
-(2.6); 8 sequence diagrams using real class and method names (2.7); a
-traceability table proving every feature reaches a use case, a sequence diagram
-and at least two patterns (2.8); and per-feature implementation narratives
-(2.9).
+36 classes (30 concrete + 6 interfaces), all relationship types and explicit
+multiplicities (2.3); **8 design patterns from the course list, exceeding the
+required minimum of 5**, each justified with the 5 required questions (2.4); a
+use-case diagram with 6 actors and 20 use cases including `«include»`/`«extend»`
+relationships (2.5); full template-structured descriptions of all 20 use cases
+with alternative flows and postconditions (2.6); 9 sequence diagrams using real
+class and method names (2.7); a traceability table proving every feature
+reaches a use case, a sequence diagram and at least two patterns (2.8);
+per-feature implementation narratives (2.9); and a CLI specification mapping
+22 verbs to the same `AgentController` methods, making every feature reachable
+from both front ends (2.10).
 
 **Key architectural commitments for Stage 2:**
 
