@@ -243,470 +243,59 @@ that `String.equals` can do.
 
 ## 2.3 UML Class Diagram
 
-Rendered with Mermaid (`classDiagram`) so the diagram is visible inline in this
-report. The equivalent PlantUML source — which renders generics such as
-`IRepository<T>` and `Flux<String>` unambiguously — is in
-`stage1/diagrams/ClassDiagram.puml`. See "Diagram sources" at the end of this
-section.
+The authoritative UML class diagram is `diagrams/ClassDiagram.puml`, rendered
+below. It is not duplicated as Mermaid because Mermaid's `classDiagram` syntax
+cannot express generic types such as `IRepository<T>` and `Flux<String>`, nor
+`{static}` members, without loss of fidelity — those notations are load-bearing
+here, because the generic repository interface and the singleton accessor are
+both central to the design.
 
-```mermaid
-classDiagram
-direction LR
+![UML Class Diagram](diagrams/ClassDiagram.png)
 
-    %% ============ INTERFACES ============
-    class ITool {
-        <<interface>>
-        +String getName()
-        +String getDescription()
-        +ParameterSchema getParameters()
-        +ToolResult execute(ToolContext ctx, Map params)
-        +boolean validate(Map params)
-        +int getCostEstimate()
-    }
+*Figure 2.3 — StudyMate class diagram: 50 types (35 concrete classes, 6
+interfaces, 9 supporting types), with attributes, key methods, relationship
+types and multiplicities. Editable source: `diagrams/ClassDiagram.puml`.*
 
-    class ILLMClient {
-        <<interface>>
-        +Completion complete(Prompt prompt)
-        +Flux~String~ stream(Prompt prompt)
-        +Embedding embed(String text)
-        +String getModelId()
-        +boolean isAvailable()
-    }
 
-    class IRepository~T~ {
-        <<interface>>
-        +T save(T entity)
-        +Optional~T~ findById(String id)
-        +List~T~ findAll()
-        +List~T~ findBy(Predicate p)
-        +boolean delete(String id)
-        +void replaceAll(List~T~ items)
-    }
-
-    class ProgressListener {
-        <<interface>>
-        +void onProgress(ProgressEvent event)
-        +void onStateChanged(AppState state)
-    }
-
-    class Command {
-        <<interface>>
-        +String getName()
-        +CommandResult execute()
-        +void undo()
-        +boolean isUndoable()
-    }
-
-    class View {
-        <<interface>>
-        +void render(Result r)
-        +void showError(AppError e)
-        +void showProgress(String msg, int pct)
-    }
-
-    %% ============ PRESENTATION ============
-    class StudyAgentGUI {
-        -JFrame frame
-        -MaterialListPanel materialPanel
-        -ChatPanel chatPanel
-        -ProgressChartPanel progressPanel
-        -ConceptGraphPanel graphPanel
-        -List~View~ views
-        +void onUpload()
-        +void onSummarize()
-        +void onAskQuestion()
-        +void onGenerateQuiz()
-        +void onSubmitQuiz()
-        +void onBuildStudyPlan()
-        +void onViewProgress()
-        +void onExportReport()
-        +void onOpenSettings()
-        +void main(String[] args)
-    }
-
-    class CLI {
-        -Scanner in
-        -AgentController controller
-        -CommandInvoker invoker
-        -Map~String,CliVerb~ verbs
-        +void start()
-        +void registerCommands()
-        +void dispatch(String line)
-        +void printHelp()
-        +void render(Result r)
-    }
-
-    class GUIController {
-        -StudyAgentGUI gui
-        -AgentController controller
-        +void attach()
-        +void onUploadClicked()
-        +void onQuestionSubmit(String q)
-    }
-
-    %% ============ AGENT CORE ============
-    class AgentController {
-        -Planner planner
-        -ToolManager toolManager
-        -MemoryManager memory
-        -LLMClient llmClient
-        -CommandInvoker invoker
-        -ProgressTracker progressTracker
-        -AppConfig config
-        +Result handleIntent(String userInput)
-        +MaterialDTO uploadMaterial(Path file)
-        +SummaryDTO summarize(String materialId, SummaryLength len)
-        +List~Concept~ extractConcepts(String materialId)
-        +AnswerDTO askQuestion(String question)
-        +StudyPlan buildStudyPlan(PlanRequest req)
-        +List~Flashcard~ generateFlashcards(FlashcardRequest req)
-        +Quiz generateQuiz(QuizRequest req)
-        +GradeResult gradeQuiz(QuizAttempt attempt)
-        +WeakTopicReport getWeakTopics()
-        +void updateDifficulty(String topic, boolean automatic)
-        +ProgressSnapshot getProgress(DateRange r)
-        +List~Reminder~ getReminders()
-        +ConceptGraph getConceptGraph()
-        +List~SessionRecord~ getHistory(HistoryFilter f)
-        +Path exportReport(ExportRequest req)
-        +void updateConfig(AppConfig cfg)
-        +void shutdown()
-    }
-
-    class Planner {
-        -MemoryManager memory
-        -ToolManager toolManager
-        -WeakTopicAnalyzer analyzer
-        +Plan plan(String intent, Map args)
-        +List~PlanStep~ decompose(Goal goal)
-        +void reorderByPriority(Plan plan)
-        +boolean isFeasible(Plan plan)
-    }
-
-    class PlanStep {
-        +String stepId
-        +String toolName
-        +Map~String,Object~ params
-        +int priority
-        +StepStatus status
-        +String error
-    }
-
-    class ToolManager {
-        -Map~String,ITool~ registry
-        -ToolFactory factory
-        -Map~String,Integer~ callCounts
-        +void register(ITool tool)
-        +ToolResult execute(String toolName, ToolContext ctx)
-        +List~String~ listTools()
-        +ITool resolve(String capability)
-    }
-
-    class ToolFactory {
-        +ITool create(String type, Map config)
-        +FileTool createFileTool()
-        +SearchTool createSearchTool()
-        +QuizTool createQuizTool()
-    }
-
-    class FileTool {
-        -List~String~ supportedExts
-        -long maxBytes
-        +Material parse(Path file)
-        +List~Chunk~ chunk(Material m, int size)
-        +void write(String path, String content)
-        +boolean validate(Path file)
-    }
-
-    class SearchTool {
-        -IRepository~Chunk~ repo
-        -ILLMClient llm
-        -BM25Index lexical
-        +List~Chunk~ hybridSearch(String q, int k)
-        +List~String~ reciprocalRankFusion(List~List~Chunk~~ ranked)
-        +double score(Chunk c, String q)
-    }
-
-    class QuizTool {
-        -QuizEngine engine
-        -AdaptiveDifficultyController difficulty
-        +List~Question~ generate(QuizRequest req)
-        +Prompt buildPrompt(QuizRequest req)
-    }
-
-    %% ============ INTELLIGENCE ============
-    class LLMClient {
-        -static LLMClient instance$
-        -ILLMClient adapter
-        -PromptBuilder promptBuilder
-        -ResponseParser parser
-        -int maxRetries
-        -double temperature
-        +static LLMClient getInstance()
-        +Completion complete(Prompt p)
-        +Flux~String~ stream(Prompt p)
-        +void setAdapter(ILLMClient a)
-        +boolean isHealthy()
-    }
-
-    class OpenAIAdapter {
-        -String apiKey
-        -String baseUrl
-        +Completion complete(Prompt p)
-        +Flux~String~ stream(Prompt p)
-        +Embedding embed(String t)
-    }
-
-    class AdminController {
-        -AgentController controller
-        -Course course
-        -boolean canPublish
-        +void onSeedCourse()
-        +void onViewInsights()
-        +SeedResult seedMaterials(Path sourceDir, Set courseDates)
-        +CourseInsights getInsights(Course c, DateRange r)
-        +void publishRemediation(String topic, Path material)
-    }
-
-    class AggregateAnalyticsService {
-        -IRepository~ProgressEvent~ repo
-        -int minStudentsForAggregate
-        +CourseInsights compute(Course c, DateRange r)
-        +Map~String,Double~ topicMastery(Course c)
-        +List~TopicScore~ classWideGaps(Map mastery, double threshold)
-        +List~String~ engagementFunnel(Course c)
-    }
-
-    class OllamaAdapter {
-        -String host
-        -String model
-        +Completion complete(Prompt p)
-        +Flux~String~ stream(Prompt p)
-    }
-
-    class PromptBuilder {
-        -String systemRole
-        -PromptTemplate template
-        -int maxContextTokens
-        +Prompt buildSummaryPrompt(Material m, SummaryLength l)
-        +Prompt buildConceptPrompt(List~String~ candidates)
-        +Prompt buildQA(String question, List~Chunk~ ctx)
-        +Prompt buildQuizPrompt(QuizRequest r, int difficulty)
-        +Prompt buildFlashcardPrompt(Concept c, int count)
-        +Prompt buildDiagnosisPrompt(List~TopicScore~ weak)
-        +Prompt buildRubricPrompt(Question q, String answer)
-    }
-
-    class ResponseParser {
-        -JsonSchema schema
-        +Completion parseCompletion(String raw)
-        +List~Concept~ parseConceptList(String json)
-        +Quiz parseQuiz(String json)
-        +List~Flashcard~ parseFlashcards(String json)
-        +AnswerDTO parseAnswer(String raw, List~Chunk~ src)
-        +GradeResult parseGrade(String json)
-        +String repair(String malformed)
-    }
-
-    %% ============ MEMORY / DATA ============
-    class MemoryManager {
-        -static MemoryManager instance$
-        -ConversationHistory history
-        -IRepository~Material~ materials
-        -IRepository~ProgressEvent~ events
-        -IRepository~Flashcard~ cards
-        -Cache~String,String~ llmCache
-        -MemoryType type
-        +static MemoryManager getInstance()
-        +void remember(String key, String value)
-        +String recall(String key)
-        +void persistAll()
-        +void loadAll()
-    }
-
-    class ConversationHistory {
-        -List~Message~ messages
-        -int maxTokens
-        +void add(Message m)
-        +List~Message~ recentWindow(int n)
-        +String compress()
-    }
-
-    class MaterialRepository {
-        -IRepository~Material~ delegate
-        -Map~String,List~Concept~~ conceptIndex
-        +Material add(Material m)
-        +Optional~Material~ get(String id)
-        +List~Material~ all()
-        +boolean remove(String id)
-        +List~Concept~ conceptsFor(String materialId)
-    }
-
-    class QuizEngine {
-        -Map~String,Quiz~ quizzes
-        -AnswerNormalizer normalizer
-        +Quiz register(Quiz q)
-        +GradeResult grade(QuizAttempt a)
-        +double exactMatch(String expected, String actual)
-        +double levenshteinRatio(String a, String b)
-    }
-
-    class ProgressTracker {
-        -List~ProgressEvent~ events
-        -Map~String,Double~ mastery
-        -List~ProgressListener~ listeners
-        -WeakTopicAnalyzer analyzer
-        +void record(ProgressEvent e)
-        +void attach(ProgressListener l)
-        +void detach(ProgressListener l)
-        +void notifyListeners(ProgressEvent e)
-        +WeakTopicReport analyze()
-        +double masteryOf(String topic)
-    }
-
-    class WeakTopicAnalyzer {
-        -double minAttempts
-        +Map~String,Double~ compute(List~ProgressEvent~ e)
-        +double ema(List~Double~ scores, double alpha)
-        +List~TopicScore~ rank(Map~String,Double~ m)
-    }
-
-    class AdaptiveDifficultyController {
-        -Map~String,Integer~ levels
-        -Map~String,Boolean~ pinned
-        -Window window
-        +int currentLevel(String topic)
-        +void step(String topic, boolean wasCorrect)
-        +int nextLevel(String topic)
-    }
-
-    class ReminderService {
-        -ScheduledExecutorService scheduler
-        -List~Reminder~ pending
-        +void schedule(Reminder r)
-        +void rescheduleAll(List~StudySession~ plan)
-        +void snooze(String reminderId, Duration d)
-        +void cancel(String reminderId)
-    }
-
-    class CommandInvoker {
-        -Deque~Command~ history
-        +void execute(Command c)
-        +void undo()
-        +void redo()
-    }
-
-    class SummarizeCommand {
-        +execute()
-        +undo()
-    }
-    class QuizCommand {
-        +execute()
-        +undo()
-    }
-    class ExportCommand {
-        +execute()
-        +undo()
-    }
-
-    %% ============ RELATIONSHIPS ============
-    AgentController --> Planner : uses (1)
-    AgentController --> ToolManager : uses (1)
-    AgentController --> MemoryManager : uses (1)
-    AgentController --> LLMClient : uses (1)
-    AgentController --> CommandInvoker : uses (1)
-    AgentController o-- ProgressTracker : 1..1
-    AgentController ..> AppConfig : dependency
-
-    StudyAgentGUI ..|> View
-    StudyAgentGUI --> GUIController : composition 1
-    GUIController --> AgentController : calls
-    CLI ..|> View
-    CLI --> AgentController : calls
-    CLI --> CommandInvoker : calls
-
-    AdminController ..|> View
-    AdminController --> AgentController : reuses (1)
-    AdminController o-- AggregateAnalyticsService
-    AggregateAnalyticsService --> IRepository : aggregates over
-    AggregateAnalyticsService ..> MaterialRepository : reads course scope
-
-    Planner --> MemoryManager : queries (1)
-    Planner --> ToolManager : plans against
-    Planner --> WeakTopicAnalyzer : uses
-    Planner *-- "0..*" PlanStep
-
-    ToolManager o-- "0..*" ITool : registry
-    ToolManager --> ToolFactory : creates
-    ITool <|.. FileTool
-    ITool <|.. SearchTool
-    ITool <|.. QuizTool
-    FileTool ..> MaterialRepository : saves via
-    SearchTool --> MaterialRepository : searches (1)
-    SearchTool ..> ILLMClient : embeds via
-
-    LLMClient ..|> ILLMClient
-    LLMClient o-- PromptBuilder
-    LLMClient o-- ResponseParser
-    ILLMClient <|.. OpenAIAdapter
-    ILLMClient <|.. OllamaAdapter
-    LLMClient ..> OpenAIAdapter : delegates (1)
-
-    MemoryManager o-- ConversationHistory
-    MemoryManager ..> IRepository : persists
-    MaterialRepository ..|> IRepository
-    MemoryManager o-- MaterialRepository
-    QuizEngine --> QuizTool
-    QuizEngine ..> LLMClient : open-ended grading
-    ProgressTracker --> WeakTopicAnalyzer
-    ProgressTracker o-- "0..*" ProgressEvent
-    ProgressTracker o-- "0..*" ProgressListener : notifies
-    ReminderService ..|> ProgressListener
-    StudyAgentGUI ..|> ProgressListener
-    QuizTool --> AdaptiveDifficultyController
-    Command <|.. SummarizeCommand
-    Command <|.. QuizCommand
-    Command <|.. ExportCommand
-    CommandInvoker o-- "0..*" Command
-```
 
 ### Diagram sources
 
-Every diagram in this report exists in two forms:
+Every diagram in this report ships as **editable PlantUML source plus a
+rendered PNG**, both committed under `stage1/diagrams/`. The class and use-case
+diagrams (2.3, 2.5) are embedded as PNGs because UML fidelity matters for those
+two. The architecture diagram (2.1) and the nine sequence diagrams (2.7, 2.10)
+are additionally written as Mermaid inline in this file, because Mermaid renders
+those two forms accurately and inline Mermaid keeps them readable without an
+image load.
 
-| Form | Location | Purpose |
-|---|---|---|
-| **Mermaid** | inline in this `.md` | Renders directly on GitHub — this is the submission artifact |
-| **PlantUML** | `stage1/diagrams/*.puml` | Renderable to PNG/SVG/PDF for slides or a printed appendix |
+| File | PNG | Diagram | Section | Format in this report |
+|---|---|---|---|---|
+| `ClassDiagram.puml` | `ClassDiagram.png` | UML class diagram | 2.3 | PNG embed |
+| `UseCaseDiagram.puml` | `UseCaseDiagram.png` | UML use-case diagram | 2.5 | PNG embed |
+| — | — | System architecture | 2.1 | Mermaid inline |
+| `SD01.puml` | `SD01.png` | Upload Learning Material | 2.7 | Mermaid inline |
+| `SD02.puml` | `SD02.png` | Summarize Document | 2.7 | Mermaid inline |
+| `SD03.puml` | `SD03.png` | Q&A over Materials (RAG) | 2.7 | Mermaid inline |
+| `SD04.puml` | `SD04.png` | Quiz Generation + Auto Grading | 2.7 | Mermaid inline |
+| `SD05.puml` | `SD05.png` | Build Personalized Study Plan | 2.7 | Mermaid inline |
+| `SD06.puml` | `SD06.png` | Extract Concepts + Concept Map | 2.7 | Mermaid inline |
+| `SD07.puml` | `SD07.png` | Progress Tracking (Observer) | 2.7 | Mermaid inline |
+| `SD08.puml` | `SD08.png` | Export Study Report | 2.7 | Mermaid inline |
+| `SD09.puml` | `SD09.png` | CLI `/ask` | 2.10 | Mermaid inline |
 
-| File | Diagram | Section |
-|---|---|---|
-| `diagrams/ClassDiagram.puml` | UML class diagram | 2.3 |
-| `diagrams/UseCaseDiagram.puml` | UML use-case diagram (native `<<include>>` / `<<extend>>`) | 2.5 |
-| `diagrams/SD01.puml` | Upload Learning Material | 2.7 |
-| `diagrams/SD02.puml` | Summarize Document | 2.7 |
-| `diagrams/SD03.puml` | Q&A over Materials (RAG) | 2.7 |
-| `diagrams/SD04.puml` | Quiz Generation + Auto Grading | 2.7 |
-| `diagrams/SD05.puml` | Build Personalized Study Plan | 2.7 |
-| `diagrams/SD06.puml` | Extract Concepts + Concept Map | 2.7 |
-| `diagrams/SD07.puml` | Progress Tracking (Observer) | 2.7 |
-| `diagrams/SD08.puml` | Export Study Report | 2.7 |
-| `diagrams/SD09.puml` | CLI `/ask` | 2.10 |
+Regenerate the PNGs with:
 
-Render with `plantuml -tpng stage1/diagrams/*.puml`.
+```bash
+java -jar plantuml.jar -tpng stage1/diagrams/*.puml
+```
 
-All 12 Mermaid blocks in this report and all 11 PlantUML files were
-syntax-checked against a Mermaid 10.x / PlantUML renderer; all render cleanly.
-Two Mermaid parse errors were found and fixed during that check (`<` inside a
-sequence message being read as an HTML tag, and `;` acting as a statement
-terminator), so the diagrams in this file are verified rather than assumed.
-
-The Mermaid use-case diagram in 2.5 is a visual approximation, since Mermaid's
-`flowchart` has no native use-case notation and no `«include»`/`«extend»`
-semantics — the dashed arrows there are labelled to mimic them. The
-authoritative use-case diagram with proper UML `<<include>>` and `<<extend>>`
-stereotypes is `diagrams/UseCaseDiagram.puml`. Mermaid is used for the class
-and sequence diagrams because it renders those accurately inline on GitHub.
+**Verification.** All 11 PlantUML files were compiled and rendered, and all
+remaining Mermaid blocks were syntax-checked against a Mermaid 10.x parser; all
+render cleanly. That check caught four real defects that would otherwise have
+shipped broken: a stray bracket in the old use-case block, `<0.6` inside a
+sequence message being read as an HTML tag, `;` acting as a statement terminator
+inside a `Note`, and a `par` block unsupported by older PlantUML builds. Every
+diagram in this report is therefore verified rather than assumed.
 
 ### Relationship legend
 
@@ -1137,125 +726,20 @@ no headless path to the agent for tests or automation.
 | UC-19 | Seed Course Materials | Admin | File System, LLM Service | F01, F03, F05 |
 | UC-20 | View Aggregate Course Usage | Admin | — | F11, F15 |
 
-```mermaid
-%% Approximate rendering. The authoritative diagram with native UML
-%% <<include>>/<<extend>> stereotypes is stage1/diagrams/UseCaseDiagram.puml
-flowchart TB
-    STU(["<b>Student</b><br/>(primary)"])
-    ADM(["<b>Admin</b>"])
-    LLMS["<b>LLM Service</b><br/>(external)"]
-    FS[("<b>File System</b><br/>(external)")]
-    REM["<b>Reminder Service</b><br/>(external)"]
-    CLK["<b>Clock / Scheduler</b><br/>(external)"]
+The authoritative UML use-case diagram is `diagrams/UseCaseDiagram.puml`,
+rendered below. It is not duplicated as Mermaid because Mermaid's `flowchart`
+syntax has no use-case notation — no `<<include>>` / `<<extend>>` stereotypes,
+no actor stick figures, no system-boundary rectangle with nested packages — so
+those relationships would have to be faked with labelled dashed arrows, which is
+exactly the kind of loss of fidelity that a graded UML artifact should not have.
+The earlier Mermaid approximation has been removed in favour of this.
 
-    subgraph SYS["<b>StudyMate — Study Agent System</b>"]
-        direction TB
+![UML Use-Case Diagram](diagrams/UseCaseDiagram.png)
 
-        subgraph LIB["Material Management"]
-            UC01(["UC-01<br/>Upload Learning<br/>Material"])
-            UC02(["UC-02<br/>Manage Material<br/>Library"])
-            UC19(["UC-19<br/>Seed Course<br/>Materials"])
-            UC20(["UC-20<br/>View Aggregate<br/>Course Usage"])
-        end
+*Figure 2.5 — StudyMate use-case diagram: 6 actors, 20 use cases inside the
+system boundary, with proper UML `<<include>>` and `<<extend>>` stereotypes.
+Editable source: `diagrams/UseCaseDiagram.puml`.*
 
-        subgraph COMP["Comprehension & Retrieval"]
-            UC03(["UC-03<br/>Summarize<br/>Document"])
-            UC04(["UC-04<br/>Extract<br/>Concepts"])
-            UC05(["UC-05<br/>Ask Question<br/>about Materials"])
-        end
-
-        subgraph PRACTICE["Practice & Assessment"]
-            UC06(["UC-06<br/>Generate<br/>Flashcards"])
-            UC07(["UC-07<br/>Review<br/>Flashcards"])
-            UC08(["UC-08<br/>Generate Quiz"])
-            UC09(["UC-09<br/>Take Quiz"])
-            UC10(["UC-10<br/>Auto Grade<br/>Quiz"])
-        end
-
-        subgraph ADAPT["Adaptation & Planning"]
-            UC11(["UC-11<br/>View<br/>Progress"])
-            UC12(["UC-12<br/>Identify<br/>Weak Topics"])
-            UC13(["UC-13<br/>Build Personalized<br/>Study Plan"])
-        end
-
-        subgraph ENGAGE["Engagement & Review"]
-            UC14(["UC-14<br/>Receive Study<br/>Reminder"])
-            UC15(["UC-15<br/>Explore<br/>Concept Map"])
-            UC16(["UC-16<br/>Review Session<br/>History"])
-            UC17(["UC-17<br/>Export Study<br/>Report"])
-            UC18(["UC-18<br/>Configure LLM<br/>Provider"])
-        end
-    end
-
-    %% --- Student associations ---
-    STU --> UC01
-    STU --> UC02
-    STU --> UC03
-    STU --> UC04
-    STU --> UC05
-    STU --> UC06
-    STU --> UC07
-    STU --> UC08
-    STU --> UC09
-    STU --> UC10
-    STU --> UC11
-    STU --> UC12
-    STU --> UC13
-    STU --> UC14
-    STU --> UC15
-    STU --> UC16
-    STU --> UC17
-    STU --> UC18
-
-    %% --- Admin associations ---
-    ADM --> UC19
-    ADM --> UC20
-    ADM -.->|"configures defaults for"| UC18
-
-    %% --- External actor associations ---
-    LLMS --> UC03
-    LLMS --> UC04
-    LLMS --> UC05
-    LLMS --> UC06
-    LLMS --> UC08
-    LLMS --> UC10
-    LLMS --> UC12
-    LLMS --> UC15
-    LLMS --> UC18
-
-    FS --> UC01
-    FS --> UC02
-    FS --> UC19
-    FS --> UC17
-    FS --> UC16
-
-    CLK --> UC07
-    CLK --> UC09
-    CLK --> UC11
-    CLK --> UC13
-    CLK --> UC14
-
-    REM --> UC14
-    UC13 -.->|"schedules"| REM
-    UC13 -.->|"«include»"| UC12
-    UC13 -.->|"«include»"| UC11
-    UC04 -.->|"«include»"| UC15
-    UC08 -.->|"«extend»<br/>adaptive difficulty"| UC12
-    UC10 -.->|"«include»"| UC12
-    UC07 -.->|"«include»"| UC11
-    UC09 -.->|"«include»"| UC10
-    UC20 -.->|"«include»"| UC11
-
-    classDef actor fill:#e8e8f8,stroke:#333,stroke-width:1.5px,color:#000
-    classDef ext fill:#fff4d6,stroke:#8a6d00,stroke-width:1.5px,color:#000
-    classDef uc fill:#ffffff,stroke:#1f5fa8,stroke-width:1.4px,color:#000
-    classDef grp fill:#f5f5f5,stroke:#999,stroke-dasharray:4 3,color:#000
-
-    class STU,ADM actor
-    class LLMS,FS,REM,CLK ext
-    class UC01,UC02,UC03,UC04,UC05,UC06,UC07,UC08,UC09,UC10,UC11,UC12,UC13,UC14,UC15,UC16,UC17,UC18,UC19,UC20 uc
-    class LIB,COMP,PRACTICE,ADAPT,ENGAGE grp
-```
 
 ### Relationship semantics used above
 
